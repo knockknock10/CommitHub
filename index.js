@@ -1,3 +1,4 @@
+require("dotenv").config({ path: "./.env" });
 const yargs = require('yargs');
 const { hideBin } =  require("yargs/helpers");
 
