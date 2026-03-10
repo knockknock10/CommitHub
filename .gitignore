@@ -1,5 +1,5 @@
 # CommitHub internal folder
-.commithub/
+.CommitHub/
 
 # dependencies
 node_modules/
