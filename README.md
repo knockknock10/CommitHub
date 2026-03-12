@@ -1,8 +1,5 @@
 # CommitHub
 
-[![Node.js](https://img.shields.io/badge/Node.js-339933?style=flat&logo=nodedotjs&logoColor=white)](https://nodejs.org/)
-[![AWS S3](https://img.shields.io/badge/AWS_S3-569A31?style=flat&logo=amazons3&logoColor=white)](https://aws.amazon.com/s3/)
-
 Most developers use `git` every day without really knowing what happens inside the `.git` folder.  
 I built **CommitHub** to explore and understand the internal mechanics behind version control systems such as snapshots, staging areas, and branching logic.
 
