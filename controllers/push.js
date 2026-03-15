@@ -4,7 +4,34 @@ const { PutObjectCommand } = require("@aws-sdk/client-s3");
 
 const { s3, S3_BUCKET } = require("../config/aws-config");
 
+/*
+    Recursively get all files inside a directory
+*/
+function getAllFiles(dirPath, arrayOfFiles = []) {
+
+    const files = fs.readdirSync(dirPath);
+
+    files.forEach((file) => {
+
+        const fullPath = path.join(dirPath, file);
+
+        if (fs.statSync(fullPath).isDirectory()) {
+
+            getAllFiles(fullPath, arrayOfFiles);
+
+        } else {
+
+            arrayOfFiles.push(fullPath);
+
+        }
+
+    });
+
+    return arrayOfFiles;
+}
+
 async function pushRepo(remote, branch) {
+
     try {
 
         // Read current branch
@@ -27,7 +54,9 @@ async function pushRepo(remote, branch) {
             return;
         }
 
-        // Upload HEAD
+        /*
+            Upload HEAD
+        */
         console.log("Uploading .CommitHub/HEAD");
 
         await s3.send(new PutObjectCommand({
@@ -36,7 +65,9 @@ async function pushRepo(remote, branch) {
             Body: fs.readFileSync(headPath)
         }));
 
-        // Upload branch pointer
+        /*
+            Upload branch pointer
+        */
         console.log(`Uploading .CommitHub/branches/${branch}`);
 
         await s3.send(new PutObjectCommand({
@@ -45,29 +76,38 @@ async function pushRepo(remote, branch) {
             Body: fs.readFileSync(branchPath)
         }));
 
-        // Upload commit files
-        const files = fs.readdirSync(commitDir);
 
-        for (const file of files) {
+        /*
+            Upload commit files (recursive)
+        */
+        const allFiles = getAllFiles(commitDir);
 
-            const filePath = path.join(commitDir, file);
+        for (const filePath of allFiles) {
 
-            console.log(`Uploading .CommitHub/commits/${commitId}/${file}`);
+            const relativePath = path
+                .relative(".CommitHub", filePath)
+                .replace(/\\/g, "/");
+
+            const s3Key = `.CommitHub/${relativePath}`;
+
+            console.log(`Uploading ${s3Key}`);
 
             await s3.send(new PutObjectCommand({
                 Bucket: S3_BUCKET,
-                Key: `.CommitHub/commits/${commitId}/${file}`,
+                Key: s3Key,
                 Body: fs.readFileSync(filePath)
             }));
+
         }
 
         console.log("Push completed !!");
 
     } catch (err) {
 
-        console.error("Push failed:", err);
+        console.error("Push failed:", err.message);
 
     }
+
 }
 
 module.exports = { pushRepo };
