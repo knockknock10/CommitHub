@@ -84,96 +84,74 @@ const fs = require("fs");
 const path = require("path");
 const crypto = require("crypto");
 
-function generateHash(data){
+function hashfile(filepath) {
+    const content = fs.readFileSync(filepath);
     return crypto
         .createHash("sha1")
-        .update(data)
+        .update(content)
         .digest("hex");
 }
 
-function commitRepo(message){
-
+function commitRepo(message) {
     const repoPath = process.cwd();
-    const commithubPath = path.join(repoPath,".CommitHub");
+    const commitsPath = path.join(repoPath, ".CommitHub");
+    const stagingPath = path.join(commitsPath, "staging");
+    const headPath = path.join(commitsPath, "HEAD");
 
-    const headPath = path.join(commithubPath,"HEAD");
+    const branch = fs.readFileSync(headPath, "utf-8").trim();
+    const branchFile = path.join(commitsPath, "branches", branch);
 
-    if(!fs.existsSync(headPath)){
-        console.log("Repository not initialized");
-        return;
-    }
-
-    const currentBranch = fs.readFileSync(headPath,"utf-8").trim();
-
-    const branchFile = path.join(commithubPath,"branches",currentBranch);
-
-    let parent = null;
-
-    if(fs.existsSync(branchFile)){
-        parent = fs.readFileSync(branchFile,"utf-8").trim();
-    }
-
-    const stagingPath = path.join(commithubPath,"staging");
-
-    if(!fs.existsSync(stagingPath)){
-        console.log("Nothing to commit");
-        return;
-    }
+    const parentCommit = fs.existsSync(branchFile)
+        ? fs.readFileSync(branchFile, "utf-8").trim()
+        : null;
 
     const files = fs.readdirSync(stagingPath);
 
-    if(files.length === 0){
-        console.log("Nothing staged");
+    if (files.length === 0) {
+        console.log("Nothing to Commit");
         return;
     }
 
-    const timestamp = Date.now();
+    let combHash = "";
+    for (const file of files) {
+        const filepath = path.join(stagingPath, file);
+        combHash += hashfile(filepath);
+    }
 
-    let hashContent = message + timestamp + parent;
+    const commitHash = crypto
+        .createHash("sha1")
+        .update(combHash + message)
+        .digest("hex");
 
-    files.forEach(file=>{
-        const filePath = path.join(stagingPath,file);
-        const content = fs.readFileSync(filePath);
-        hashContent += content;
-    });
+    const commitDir = path.join(commitsPath, "commits", commitHash);
 
-    const commitId = generateHash(hashContent);
+    if (fs.existsSync(commitDir)) {
+        console.log("commit already exists");
+        return;
+    }
 
-    const commitFolder = path.join(
-        commithubPath,
-        "commits",
-        commitId
-    );
+    fs.mkdirSync(commitDir, { recursive: true });
 
-    fs.mkdirSync(commitFolder,{recursive:true});
-
-    files.forEach(file=>{
-        const src = path.join(stagingPath,file);
-        const dest = path.join(commitFolder,file);
-        fs.copyFileSync(src,dest);
-    });
+    for (const file of files) {
+        const src = path.join(stagingPath, file);
+        const dest = path.join(commitDir, file);
+        fs.copyFileSync(src, dest);
+    }
 
     const commitData = {
-        id: commitId,
-        message: message,
-        parent: parent,
-        timestamp: timestamp,
-        branch: currentBranch
+        message,
+        parent: parentCommit,
+        timeStamp: Date.now()
     };
 
     fs.writeFileSync(
-        path.join(commitFolder,"commit.json"),
-        JSON.stringify(commitData,null,2)
+        path.join(commitDir, "commit.json"),
+        JSON.stringify(commitData, null, 2)
     );
 
-    fs.writeFileSync(branchFile,commitId);
+    fs.writeFileSync(branchFile, commitHash);
 
-    files.forEach(file=>{
-        const filePath = path.join(stagingPath,file);
-        fs.unlinkSync(filePath);
-    });
-
-    console.log("Commit created:",commitId);
+    console.log("commit created:", commitHash);
 }
 
 module.exports = { commitRepo };
