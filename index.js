@@ -16,11 +16,12 @@ const { pullRepo } = require("./controllers/pull");
 const { logRepo } = require("./controllers/log");
 const { statusRepo } = require("./controllers/status");
 const { revertRepo } = require("./controllers/revert");
-
+  
 yargs(hideBin(process.argv))
   .scriptName("commithub")
   .usage("Usage: $0 <command> [options]")
 
+  .command("start","Starts a new Server",{},initRepo)
   // init
   .command(
     "init",
@@ -210,3 +211,36 @@ yargs(hideBin(process.argv))
   .help()
   .version("1.0.0")
   .argv;
+  
+  // function startServer(){
+  //   const app = express();
+  //   const port = process.env.PORT || 3000;
+    
+  //   app.use(bodyParser.json());
+  //   app.use(express.json());
+    
+    
+    
+  //   let user = "test";
+  //   app.use(cors({origin: "*"}));//Lallowing all req from all the origin
+  //   app.get("/",(req,res)=>{
+  //     res.send("Welcome!");
+  //   })
+    
+  //   const httpServer = http.createServer(app);
+  //   const io = new server(http)({
+  //     cors:{
+  //       origin:"*",
+  //       methods:["GET","POST"],
+  //     }
+  //   })
+  //   io.on("connection",(socket)=>{//when the server is on connect
+  //     socket.on("JoinRoom",(userId)=>{
+  //       console.log("====");
+  //       console.log("User");
+  //       console.log('===');
+  //       socket.join(userId);
+  //     })
+  //   })
+    
+  // }
