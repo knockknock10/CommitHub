@@ -20,6 +20,11 @@ const IssueSchema = Schema({
         ref:"Repository",
         required:true,
     },
+    Labels:{
+        type:String,
+        lab:["bug","docuementation","duplicate","enchancement","good first issue","help wanted","question"]
+    },
+    
 })
 
 const Issue = mongoose.model("Issue",IssueSchema);
