@@ -6,9 +6,8 @@ const COMMITHUB = path.join(ROOT, ".CommitHub");
 const REFS_HEADS = path.join(COMMITHUB, "refs", "heads");
 const HEAD_FILE = path.join(COMMITHUB, "HEAD");
 
-/* =========================
-   🔹 HELPERS
-========================= */
+
+//  HELPERS
 
 // Get current branch name
 function getCurrentBranch() {
@@ -49,9 +48,9 @@ function validateRepo() {
     }
 }
 
-/* =========================
-   🔹 MAIN FUNCTION (USED BY YARGS)
-========================= */
+
+// MAIN FUNCTION
+
 
 function branchRepo(branchName) {
     try {
