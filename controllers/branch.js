@@ -3,7 +3,7 @@ const path = require("path");
 
 const ROOT = process.cwd();
 const COMMITHUB = path.join(ROOT, ".CommitHub");
-const REFS_HEADS = path.join(COMMITHUB, "refs", "heads");
+const REFS_HEADS = path.join(COMMITHUB, "branches");
 const HEAD_FILE = path.join(COMMITHUB, "HEAD");
 
 
