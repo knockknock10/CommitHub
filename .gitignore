@@ -1,25 +1,15 @@
 # CommitHub internal folder
 .CommitHub/
-
-# dependencies
 node_modules/
-
-# logs
 logs
 *.log
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-
-# environment variables
 .env
 .env.*
-
-# build output
 dist/
 build/
-
-# coverage reports
 coverage/
 
 # OS generated files

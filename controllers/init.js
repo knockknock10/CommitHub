@@ -5,9 +5,9 @@ async function initRepo() {
    const rootPath = process.cwd();
    const repoPath = path.join(rootPath, ".CommitHub");
 
-   const commitPath = path.join(repoPath, "commits");
+   const commitsPath = path.join(repoPath, "commits");
    const stagingPath = path.join(repoPath, "staging");
-   const branchPath = path.join(repoPath, "branches");
+   const refsHeadsPath = path.join(repoPath, "refs", "heads");
 
    try {
       // Prevent re-init
@@ -17,27 +17,24 @@ async function initRepo() {
          return;
       }
 
-      // Create main folder
-      await fs.mkdir(repoPath, { recursive: true });
-
-      // Subfolders
-      await fs.mkdir(commitPath, { recursive: true });
+      // Create base folders
+      await fs.mkdir(commitsPath, { recursive: true });
       await fs.mkdir(stagingPath, { recursive: true });
-      await fs.mkdir(branchPath, { recursive: true });
+      await fs.mkdir(refsHeadsPath, { recursive: true });
 
-      // FIXED HEAD
+      // Create main branch
+      await fs.writeFile(
+         path.join(refsHeadsPath, "main"),
+         ""
+      );
+
+      // HEAD pointer
       await fs.writeFile(
          path.join(repoPath, "HEAD"),
          "ref: refs/heads/main"
       );
 
-      // Default branch
-      await fs.writeFile(
-         path.join(branchPath, "main"),
-         ""
-      );
-
-      // Config
+      // (Optional config — fine to keep)
       await fs.writeFile(
          path.join(repoPath, "config.json"),
          JSON.stringify({
