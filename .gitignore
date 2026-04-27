@@ -1,0 +1,10 @@
+# CommitHub internal folder
+.CommitHub/
+node_modules/
+logs
+.env
+.env.*
+dist/
+build/
+coverage/
+.npm

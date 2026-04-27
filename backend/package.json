@@ -1,0 +1,39 @@
+{
+  "name": "backend",
+  "version": "1.0.0",
+  "description": "CommitHub – A lightweight personal version control system for managing commits, branches, and merges with a local and collaborative workflow. Designed to teach and demonstrate Git-like functionality in a clean, developer-friendly CLI.",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "test": "echo \"No tests yet\" && exit 0"
+  },
+  "keywords": [
+    "version-control",
+    "git",
+    "commit",
+    "branch",
+    "merge",
+    "repository",
+    "vcs",
+    "cli"
+  ],
+  "overrides": {
+    "fast-xml-parser": "^5.5.5"
+  },
+  "author": "Sanjeev Kr",
+  "license": "MIT",
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.893.0",
+    "bcryptjs": "^3.0.3",
+    "body-parser": "^2.2.2",
+    "cors": "^2.8.6",
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "http": "^0.0.1-security",
+    "jsonwebtoken": "^9.0.3",
+    "mongoose": "^9.3.1",
+    "socket.io": "^4.8.3",
+    "uuid": "^13.0.0",
+    "yargs": "^18.0.0"
+  }
+}
