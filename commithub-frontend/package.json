@@ -10,6 +10,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "country-region-data": "^4.1.0",
+    "country-state-city": "^3.2.1",
     "react": "^19.2.5",
     "react-dom": "^19.2.5"
   },
