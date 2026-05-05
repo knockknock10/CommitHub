@@ -1,6 +1,6 @@
 import { Country } from "country-state-city";
 import { useState } from "react";
-
+import "./auth.css"
 const SignUp = () => {
     const [countries] = useState(Country.getAllCountries());
     const [selectedCountry, setSelectedCountry] = useState("");
@@ -31,27 +31,66 @@ const SignUp = () => {
     };
 
     return (
+        <>
+        
+            
         <div className="signup-container">
-            <h3>Sign up for CommitHub</h3>
-            <p>
+             <h2 id="msg">Sign up for CommitHub</h2>
+            <p className="signin">
                 Already have an account? <a href="#">Sign in</a>
             </p>
-
-            <form onSubmit={handleSubmit}>
+           
+            <form className="form" onSubmit={handleSubmit}>
+                <div className="firstlast">
+                    <label>
+                        <input
+                            type="text"
+                            name="firstname"
+                            placeholder="Firstname"
+                            value={formData.firstname}
+                            onChange={handleChange}
+                            required
+                        />
+                    </label><label>
+                        <input
+                            type="text"
+                            name="lastname"
+                            placeholder="Lastname"
+                            value={formData.lastname}
+                            onChange={handleChange}
+                            required
+                        />
+                    </label>
+                </div>
+                <div className="country">
+                    <label>
+                        <select
+                            value={selectedCountry}
+                            onChange={handleCountryChange}
+                        >
+                            <option value="">Select Country</option>
+                            {countries.map((c) => (
+                                <option key={c.isoCode} value={c.isoCode}>
+                                    {c.name}
+                                </option>
+                            ))}
+                        </select>
+                    </label>
+                </div>
+                <div className="email">
+                    <label>
+                        <input
+                            type="email"
+                            name="email"
+                            placeholder="Email"
+                            value={formData.email}
+                            onChange={handleChange}
+                            required
+                        />
+                    </label>
+                </div>
+                <div className="pwd">
                 <label>
-                    Email*
-                    <input
-                        type="email"
-                        name="email"
-                        placeholder="Email"
-                        value={formData.email}
-                        onChange={handleChange}
-                        required
-                    />
-                </label>
-
-                <label>
-                    Password*
                     <input
                         type="password"
                         name="password"
@@ -60,14 +99,11 @@ const SignUp = () => {
                         onChange={handleChange}
                         required
                     />
-                    <p>
-                        Password should be at least 15 characters OR at least 8
-                        characters including a number and a lowercase letter.
-                    </p>
+                    
                 </label>
-
+                </div>
+                <div className="btn">
                 <label>
-                    Username*
                     <input
                         type="text"
                         name="username"
@@ -76,30 +112,15 @@ const SignUp = () => {
                         onChange={handleChange}
                         required
                     />
-                    <p>
-                        Username may only contain alphanumeric characters or
-                        single hyphens, and cannot begin or end with a hyphen.
-                    </p>
+                    
                 </label>
-
-                <label>
-                    Country
-                    <select
-                        value={selectedCountry}
-                        onChange={handleCountryChange}
-                    >
-                        <option value="">Select Country</option>
-                        {countries.map((c) => (
-                            <option key={c.isoCode} value={c.isoCode}>
-                                {c.name}
-                            </option>
-                        ))}
-                    </select>
-                </label>
+                </div>
+                
 
                 <button type="submit">Create account</button>
             </form>
         </div>
+    </>
     );
 };
 
