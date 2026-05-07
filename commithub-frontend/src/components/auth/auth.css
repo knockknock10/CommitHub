@@ -1,34 +1,206 @@
-/* 
-.signup-container {
-    display: flex;
-    flex-direction: column;
-    align-items: flex-end;
-    justify-content: flex-start;
-    height: 100vh;
-    width: 50%;
-    margin-left: auto; 
-    background-color: whitesmoke;
-    color: black;
-} */
-
 *{
-    background-color: black;
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
 }
-.signup-container {
+body{
+    font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+    background: #f5f7fa;
+    color: #111827;
+}
+.page{
+    min-height: 100vh;
     display: flex;
-    flex-direction: column;
-    justify-items: center;
-    align-items:center; 
-    height: 100vh;
+    justify-content: center;
+    padding-top: 55px;
+    padding-left: 20px;
+    padding-right: 20px;
 }
-#msg{
-    margin-top: 2.5%;
+.signup-container{
+    width: 100%;
+    max-width: 470px;
 }
-.firstlast input{
-    padding: 14px 16px;
-    border: 14px solid whitesmoke;
-    border-radius: 12px;
-    order: none;
-    
+.brand{
+    font-size: 42px;
+    font-weight: 700;
+    letter-spacing: -1px;
+    margin-bottom: 12px;
+    color: #111827;
 }
 
+.title{
+    font-size: 34px;
+    font-weight: 650;
+    line-height: 1.15;
+    margin-bottom: 12px;
+    color: #111827;
+}
+.subtitle{
+    font-size: 17px;
+    color: #4b5563;
+    line-height: 1.6;
+    margin-bottom: 18px;
+}
+.signin{
+    font-size: 15px;
+    color: #6b7280;
+    margin-bottom: 34px;
+}
+.signin a{
+    color: #2563eb;
+    text-decoration: none;
+    font-weight: 500;
+}
+.form{
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+.firstlast{
+    display: flex;
+    gap: 16px;
+}
+.input-group{
+    position: relative;
+    width: 100%;
+}
+.input-group input{
+    width: 100%;
+    padding: 26px 16px 10px;
+    font-size: 17px;
+    border: 1px solid #d1d5db;
+    border-radius: 14px;
+    outline: none;
+    background: transparent;
+    transition: all 0.2s ease;
+    color: #111827;
+}
+.input-group label{
+    position: absolute;
+    left: 16px;
+    top: 18px;
+    color: #6b7280;
+    font-size: 17px;
+    pointer-events: none;
+    transition: all 0.2s ease;
+    background: #f5f7fa;
+    padding: 0 4px;
+}
+.input-group input:focus + label,
+.input-group input:valid + label{
+    top: 7px;
+    font-size: 12px;
+    color: #2563eb;
+}
+.input-group input:focus{
+    border-color: #2563eb;
+    box-shadow:
+    0 0 0 4px rgba(37,99,235,0.12);
+}
+.select-group select{
+    width: 100%;
+    height: 58px;
+    border-radius: 14px;
+    border: 1px solid #d1d5db;
+    padding: 0 16px;
+    font-size: 17px;
+    outline: none;
+    background: transparent;
+    color: #111827;
+    transition: all 0.2s ease;
+}
+.select-group select:focus{
+    border-color: #2563eb;
+    box-shadow:
+    0 0 0 4px rgba(37,99,235,0.12);
+}
+.dob-section{
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.dob-title{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 16px;
+    font-weight: 600;
+    color: #111827;
+}
+
+.info{
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #6b7280;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    cursor: pointer;
+}
+.dob-inputs{
+    display: flex;
+    gap: 14px;
+}
+.dob-inputs select{
+    flex: 1;
+    height: 54px;
+    border-radius: 14px;
+    border: 1px solid #c7c7cc;
+    padding: 0 14px;
+    font-size: 17px;
+    background: transparent;
+    outline: none;
+    color: #111827;
+    transition: all 0.2s ease;
+}
+.dob-inputs select:focus{
+    border-color: #2563eb;
+    box-shadow:
+    0 0 0 4px rgba(37,99,235,0.12);
+}
+.divider{
+    border: none;
+    height: 1px;
+    background: #e5e7eb;
+    margin: 8px 0;
+}
+.btn{
+    margin-top: 6px;
+    height: 58px;
+    border: none;
+    border-radius: 14px;
+    background: #111827;
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.btn:hover{
+    background: #1f2937;
+    transform: translateY(-1px);
+}
+.btn:active{
+    transform: scale(0.98);
+}
+/* mobile */
+@media(max-width: 600px){
+    .title{
+        font-size: 28px;
+    }
+    .firstlast{
+        flex-direction: column;
+    }
+    .dob-inputs{
+        flex-direction: column;
+    }
+    .page{
+        padding-top: 30px;
+    }
+}
