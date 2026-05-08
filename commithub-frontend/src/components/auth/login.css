@@ -1,0 +1,92 @@
+*{
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+body{
+    font-family:
+    -apple-system,
+    BlinkMacSystemFont,
+    sans-serif;
+    background: #f5f7fa;
+    color: #111827;
+}
+.page{
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding-top: 55px;
+    padding-left: 20px;
+    padding-right: 20px;
+}
+
+.form{
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.emailphone{
+    display: flex;
+    gap: 16px;
+}
+.input-group{
+    position: relative;
+    width: 100%;
+}
+.input-group input{
+    width: 100%;
+    padding: 26px 16px 10px;
+    font-size: 17px;
+    border: 1px solid #d1d5db;
+    border-radius: 14px;
+    outline: none;
+    background: transparent;
+    transition: all 0.2s ease;
+    color: #111827;
+}
+.input-group label{
+    position: absolute;
+    left: 16px;
+    top: 18px;
+    color: #6b7280;
+    font-size: 17px;
+    pointer-events: none;
+    transition: all 0.2s ease;
+    background: #f5f7fa;
+    padding: 0 4px;
+}
+.input-group input:focus + label,
+.input-group input:valid + label{
+    top: 7px;
+    font-size: 12px;
+    color: #2563eb;
+}
+.input-group input:focus{
+    border-color: #2563eb;
+    box-shadow:
+    0 0 0 4px rgba(37,99,235,0.12);
+}
+
+
+
+
+.btn{
+    margin-top: 6px;
+    height: 58px;
+    border: none;
+    border-radius: 14px;
+    background: #111827;
+    color: white;
+    font-size: 16px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.btn:hover{
+    background: #1f2937;
+    transform: translateY(-1px);
+}
+.btn:active{
+    transform: scale(0.98);
+}

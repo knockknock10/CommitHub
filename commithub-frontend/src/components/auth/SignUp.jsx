@@ -56,7 +56,7 @@ const SignUp = () => {
                     Build. Commit. Collaborate.
                 </h2>
                 <p className="subtitle">
-                    Create your CommitHub account and
+                     Create your CommitHub account and
                     start building your next generation
                     projects with confidence.
                 </p>
