@@ -11,32 +11,90 @@ body{
     background: #f5f7fa;
     color: #111827;
 }
+/* page */
+
 .page{
     min-height: 100vh;
+
     display: flex;
+
     justify-content: center;
-    padding-top: 55px;
+
+    padding-top: 70px;
+
     padding-left: 20px;
+
     padding-right: 20px;
 }
 
+/* login container */
+
+.login-container{
+
+    width: 100%;
+
+    max-width: 460px;
+}
+/* brand */
+.brand{
+    font-size: 42px;
+
+    font-weight: 700;
+
+    letter-spacing: -1px;
+
+    margin-bottom: 14px;
+
+    color: #111827;
+}
+/* tile */
+.title{
+    font-size: 38px;
+    font-weight: 700;
+    line-height: 1.1;
+    margin-bottom: 14px;
+    color: #111827;
+}
+/* title */
+.subtitle{
+    font-size: 17px;
+    color: #4b5563;
+    line-height: 1.6;
+    margin-bottom: 18px;
+}
+
+/* signin */
+.signin{
+    font-size: 15px;
+    color: #6b7280;
+    margin-bottom: 34px;
+}
+.signin a{
+    color: #2563eb;
+    text-decoration: none;
+    font-weight: 500;
+}
+/* form */
 .form{
     display: flex;
     flex-direction: column;
     gap: 18px;
 }
 
-.emailphone{
-    display: flex;
-    gap: 16px;
-}
+/* inp grp */
+
 .input-group{
     position: relative;
+
     width: 100%;
 }
+/* input */
+
 .input-group input{
     width: 100%;
+
     padding: 26px 16px 10px;
+
     font-size: 17px;
     border: 1px solid #d1d5db;
     border-radius: 14px;
@@ -45,6 +103,9 @@ body{
     transition: all 0.2s ease;
     color: #111827;
 }
+
+/* label */
+
 .input-group label{
     position: absolute;
     left: 16px;
@@ -56,37 +117,95 @@ body{
     background: #f5f7fa;
     padding: 0 4px;
 }
+/* float */
 .input-group input:focus + label,
 .input-group input:valid + label{
     top: 7px;
     font-size: 12px;
     color: #2563eb;
 }
+/* foucus */
 .input-group input:focus{
     border-color: #2563eb;
     box-shadow:
     0 0 0 4px rgba(37,99,235,0.12);
 }
+/* login opt */
+.login-options{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 4px;
+}
+/* remember */
+.remember{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 15px;
 
+    color: #4b5563;
+}
 
+.remember input{
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
 
+/* forgot */
+
+.forgot{
+
+    text-decoration: none;
+    color: #2563eb;
+    font-size: 15px;
+    font-weight: 500;
+}
+
+/* button */
 
 .btn{
-    margin-top: 6px;
+    margin-top: 10px;
     height: 58px;
     border: none;
+
     border-radius: 14px;
     background: #111827;
+
     color: white;
     font-size: 16px;
     font-weight: 600;
     cursor: pointer;
+
     transition: all 0.2s ease;
 }
 .btn:hover{
+
     background: #1f2937;
     transform: translateY(-1px);
 }
+
 .btn:active{
     transform: scale(0.98);
+}
+
+/* mobileview */
+
+@media(max-width: 600px){
+
+    .title{
+        font-size: 30px;
+    }
+
+    .page{
+        padding-top: 40px;
+    }
+
+    .login-options{
+
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 12px;
+    }
 }
