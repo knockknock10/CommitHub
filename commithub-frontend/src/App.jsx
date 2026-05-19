@@ -6,17 +6,21 @@ import {
 
 import Landing from "./pages/Landing";
 
-import Login from
-"./components/auth/Login";
+import Login from "./components/auth/Login";
 
-import SignUp from
-"./components/auth/SignUp";
+import SignUp from "./components/auth/SignUp";
 
-import Dashboard from
-"./pages/Dashboard";
+import Dashboard from "./pages/Dashboard";
 
-import ProtectedRoute from
-"./routes/ProtectedRoute";
+import Repositories from "./pages/Repositories";
+
+import RepositoryDetails from "./pages/RepositoryDetails";
+
+import Issues from "./pages/Issues";
+
+import PullRequests from "./pages/PullRequests";
+
+import ProtectedRoute from "./routes/ProtectedRoute";
 
 const App = () => {
 
@@ -25,8 +29,6 @@ const App = () => {
         <BrowserRouter>
 
             <Routes>
-
-                {/* public */}
 
                 <Route
                     path="/"
@@ -43,16 +45,47 @@ const App = () => {
                     element={<SignUp />}
                 />
 
-                {/* protected */}
-
                 <Route
                     path="/dashboard"
                     element={
-
                         <ProtectedRoute>
-
                             <Dashboard />
+                        </ProtectedRoute>
+                    }
+                />
 
+                <Route
+                    path="/repositories"
+                    element={
+                        <ProtectedRoute>
+                            <Repositories />
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path="/repositories/:repoName"
+                    element={
+                        <ProtectedRoute>
+                            <RepositoryDetails />
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path="/issues"
+                    element={
+                        <ProtectedRoute>
+                            <Issues />
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path="/pull-requests"
+                    element={
+                        <ProtectedRoute>
+                            <PullRequests />
                         </ProtectedRoute>
                     }
                 />
