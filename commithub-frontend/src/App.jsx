@@ -20,6 +20,8 @@ import Issues from "./pages/Issues";
 
 import PullRequests from "./pages/PullRequests";
 
+import Activity from "./pages/Activity";
+
 import ProtectedRoute from "./routes/ProtectedRoute";
 
 const App = () => {
@@ -86,6 +88,15 @@ const App = () => {
                     element={
                         <ProtectedRoute>
                             <PullRequests />
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path="/activity"
+                    element={
+                        <ProtectedRoute>
+                            <Activity />
                         </ProtectedRoute>
                     }
                 />
