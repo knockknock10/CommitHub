@@ -1,42 +1,74 @@
-const mongoose = require('mongoose');
-const { required } = require('yargs');
+import mongoose from "mongoose";
 
-const UserSchema = mongoose.Schema(
+const UserSchema = new mongoose.Schema(
+
     {
-        userName: {
-            type: String,
-            required: true,
-            unique:true,
-        },
-        email: {
-            type: String,
-            required: true,
-            unique: true,
-        },
-        password: {
-            type: String,
-            required: true,
-        },
-        repositories:[{
-            default:[],
-            type:mongoose.Schema.Types.ObjectId,//will point to repo and act as a link
-            ref:"Repository",
-        }],
-        
-        followedUsers:[
-        {
-            default:[],
-            type:mongoose.Schema.Types.ObjectId,
-            ref:"User",
-        }],
-        starRepo:[
-        {
-            default:[],
-            type:mongoose.Schema.Types.ObjectId,
-            ref:"Repository",
-        }],
-    }, { timestamps: true }
-);
-const User = mongoose.model("User",UserSchema);
 
-module.exports = User;
+        userName: {
+
+            type: String,
+
+            required: true,
+
+            unique: true
+        },
+
+        email: {
+
+            type: String,
+
+            required: true,
+
+            unique: true
+        },
+
+        password: {
+
+            type: String,
+
+            required: true
+        },
+
+        repositories: [
+
+            {
+
+                type: mongoose.Schema.Types.ObjectId,
+
+                ref: "Repository"
+            }
+        ],
+
+        followedUsers: [
+
+            {
+
+                type: mongoose.Schema.Types.ObjectId,
+
+                ref: "User"
+            }
+        ],
+
+        starRepo: [
+
+            {
+
+                type: mongoose.Schema.Types.ObjectId,
+
+                ref: "Repository"
+            }
+        ]
+    },
+
+    {
+
+        timestamps: true
+    }
+);
+
+const User = mongoose.model(
+    "User",
+    UserSchema
+);
+
+export default User;
