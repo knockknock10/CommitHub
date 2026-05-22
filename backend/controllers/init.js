@@ -1,53 +1,36 @@
-const fs = require("fs").promises;
-const path = require("path");
+import fs from "fs/promises";
+import path from "path";
 
 async function initRepo() {
-   const rootPath = process.cwd();
-   const repoPath = path.join(rootPath, ".CommitHub");
+    const rootPath = process.cwd();
+    const repoPath = path.join(rootPath, ".CommitHub");
+    const commitsPath = path.join(repoPath, "commits");
+    const stagingPath = path.join(repoPath, "staging");
+    const refsHeadsPath = path.join(repoPath, "refs", "heads");
 
-   const commitsPath = path.join(repoPath, "commits");
-   const stagingPath = path.join(repoPath, "staging");
-   const refsHeadsPath = path.join(repoPath, "refs", "heads");
+    try {
+        const exists = await fs.stat(repoPath).catch(() => null);
 
-   try {
-      // Prevent re-init
-      const exists = await fs.stat(repoPath).catch(() => null);
-      if (exists) {
-         console.log("Repository already initialized");
-         return;
-      }
+        if (exists) {
+            console.log("Repository already initialized");
+            return;
+        }
 
-      // Create base folders
-      await fs.mkdir(commitsPath, { recursive: true });
-      await fs.mkdir(stagingPath, { recursive: true });
-      await fs.mkdir(refsHeadsPath, { recursive: true });
+        await fs.mkdir(commitsPath, { recursive: true });
+        await fs.mkdir(stagingPath, { recursive: true });
+        await fs.mkdir(refsHeadsPath, { recursive: true });
 
-      // Create main branch
-      await fs.writeFile(
-         path.join(refsHeadsPath, "main"),
-         ""
-      );
+        await fs.writeFile(path.join(refsHeadsPath, "main"), "");
+        await fs.writeFile(path.join(repoPath, "HEAD"), "ref: refs/heads/main");
+        await fs.writeFile(
+            path.join(repoPath, "config.json"),
+            JSON.stringify({ author: null, currentBranch: "main", remotes: {} }, null, 2)
+        );
 
-      // HEAD pointer
-      await fs.writeFile(
-         path.join(repoPath, "HEAD"),
-         "ref: refs/heads/main"
-      );
-
-      // (Optional config — fine to keep)
-      await fs.writeFile(
-         path.join(repoPath, "config.json"),
-         JSON.stringify({
-            author: null,
-            currentBranch: "main",
-            remotes: {}
-         }, null, 2)
-      );
-
-      console.log("Repository initialized successfully");
-   } catch (err) {
-      console.error("Error while initializing:", err.message);
-   }
+        console.log("Repository initialized successfully");
+    } catch (error) {
+        console.error("Error while initializing:", error.message);
+    }
 }
 
-module.exports = { initRepo };
+export { initRepo };

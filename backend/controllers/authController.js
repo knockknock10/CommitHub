@@ -1,49 +1,64 @@
-const User = require("../models/userModel");
-const bcrypt = require("bcryptjs");
-const generateToken = require("../utils/generateToken.js");
+import bcrypt from "bcryptjs";
+import User from "../models/userModel.js";
+import generateToken from "../utils/generateToken.js";
 
-const signup = async(req,res)=>{
-    try{
-        const {userName,email,password} = req.body;
-        const userExit = await User.findOne({email});
-        if(userExit){
-            return res.status(400).json({messgae:"User already Exits"});
+/* signup */
+export const signup = async (req, res) => {
+    try {
+        const { userName, email, password } = req.body;
+        const existingUser = await User.findOne({ email });
+
+        if (existingUser) {
+            return res.status(400).json({
+                message: "User already exists"
+            });
         }
-        const hashedpwd = await bcrypt.hash(password,10);
+
+        const hashedPassword = await bcrypt.hash(password, 10);
         const user = await User.create({
             userName,
             email,
-            password:hashedpwd
-        })
-        res.status(201).json({
-            _id:user.id,
-            userName:user.userName,
-            email:user.email,
-            password:user.password,
+            password: hashedPassword
         });
-        
-        
-    }catch(error){
-        res.status(500).json({messgae:error.messgae});
+
+        res.status(201).json({
+            token: generateToken(user._id),
+            user: {
+                _id: user._id,
+                userName: user.userName,
+                email: user.email
+            }
+        });
+    } catch (error) {
+        res.status(500).json({
+            message: error.message
+        });
     }
 };
-const login = async(req,res)=>{
-    try{
-        const {userName,email,password} = req.body;
-        const user = await User.findOne({email});
-        if(user && (await bcrypt.compare(password,user.password))){
-            res.json({
-                _id:user.id,
-                userName:user.userName,
-                email:user.email,
-                token:generateToken(user._id)
-            });
-        }else{
-            res.status(401).json({messgae:"Invalid Credentials!!"});
-        }
-    }catch(err){
-        res.status(500).json({messgae:err.messgae});
-    }
-}
 
-module.exports = {signup,login};
+/* login */
+export const login = async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        const user = await User.findOne({ email });
+
+        if (user && await bcrypt.compare(password, user.password)) {
+            return res.json({
+                token: generateToken(user._id),
+                user: {
+                    _id: user._id,
+                    userName: user.userName,
+                    email: user.email
+                }
+            });
+        }
+
+        return res.status(401).json({
+            message: "Invalid credentials"
+        });
+    } catch (error) {
+        res.status(500).json({
+            message: error.message
+        });
+    }
+};
