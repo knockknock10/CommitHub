@@ -1,13 +1,11 @@
-const fs = require("fs");
-const path = require("path");
+import fs from "fs";
+import path from "path";
 
-function walkDir(dir) {
+const walkDir = (dir) => {
     let results = [];
 
     const list = fs.readdirSync(dir);
-
-    list.forEach(file => {
-
+    list.forEach((file) => {
         const filePath = path.join(dir, file);
         const stat = fs.statSync(filePath);
 
@@ -16,10 +14,9 @@ function walkDir(dir) {
         } else {
             results.push(filePath);
         }
-
     });
 
     return results;
-}
+};
 
-module.exports = { walkDir };
+export default walkDir;
