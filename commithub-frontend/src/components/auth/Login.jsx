@@ -6,6 +6,9 @@ from "react-router-dom";
 import { useAuth }
 from "../../context/AuthContext";
 
+import { loginUser }
+from "../../api/authApi";
+
 import "./auth.css";
 
 const Login = () => {
@@ -14,7 +17,14 @@ const Login = () => {
 
     const { login } = useAuth();
 
-    const [formData, setFormData] = useState({
+    const [loading, setLoading] =
+    useState(false);
+
+    const [error, setError] =
+    useState("");
+
+    const [formData, setFormData] =
+    useState({
 
         email: "",
         password: ""
@@ -22,7 +32,8 @@ const Login = () => {
 
     const handleChange = (e) => {
 
-        const { name, value } = e.target;
+        const { name, value } =
+        e.target;
 
         setFormData((prev) => ({
             ...prev,
@@ -30,20 +41,36 @@ const Login = () => {
         }));
     };
 
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
 
         e.preventDefault();
 
-        const mockUser = {
+        try{
 
-            email: formData.email,
+            setLoading(true);
 
-            token: "sample-jwt-token"
-        };
+            setError("");
 
-        login(mockUser);
+            const data =
+            await loginUser(formData);
 
-        navigate("/dashboard");
+            login(data);
+
+            navigate("/dashboard");
+
+        }catch(error){
+
+            setError(
+
+                error.response?.data?.message ||
+
+                "login failed"
+            );
+
+        }finally{
+
+            setLoading(false);
+        }
     };
 
     return (
@@ -115,33 +142,26 @@ const Login = () => {
 
                     </div>
 
-                    <div className="login-options">
+                    {error && (
 
-                        <label className="remember">
+                        <p className="auth-error">
 
-                            <input type="checkbox" />
+                            {error}
 
-                            <span>
-                                Remember me
-                            </span>
-
-                        </label>
-
-                        <a
-                            href="/"
-                            className="forgot"
-                        >
-                            Forgot password?
-                        </a>
-
-                    </div>
+                        </p>
+                    )}
 
                     <button
                         className="btn"
                         type="submit"
+                        disabled={loading}
                     >
 
-                        Sign in to CommitHub
+                        {
+                            loading
+                            ? "Signing in..."
+                            : "Sign in to CommitHub"
+                        }
 
                     </button>
 

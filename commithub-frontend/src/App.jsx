@@ -22,6 +22,8 @@ import PullRequests from "./pages/PullRequests";
 
 import Activity from "./pages/Activity";
 
+import Settings from "./pages/Settings";
+
 import ProtectedRoute from "./routes/ProtectedRoute";
 
 const App = () => {
@@ -97,6 +99,15 @@ const App = () => {
                     element={
                         <ProtectedRoute>
                             <Activity />
+                        </ProtectedRoute>
+                    }
+                />
+
+                <Route
+                    path="/settings"
+                    element={
+                        <ProtectedRoute>
+                            <Settings />
                         </ProtectedRoute>
                     }
                 />
