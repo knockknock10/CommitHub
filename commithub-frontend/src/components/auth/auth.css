@@ -204,3 +204,11 @@ body{
         padding-top: 30px;
     }
 }
+.auth-error{
+
+    color: #ff6b6b;
+
+    font-size: 14px;
+
+    margin-top: 6px;
+}

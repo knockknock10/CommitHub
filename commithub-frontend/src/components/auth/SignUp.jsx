@@ -1,49 +1,63 @@
-import { Country } from "country-state-city";
-import { useState } from "react";
+import {
+    useState
+} from "react";
+
+import {
+    useNavigate
+} from "react-router-dom";
+
+import {
+    signupUser
+} from "../../api/authApi";
+
+import {
+    useAuth
+} from "../../context/AuthContext";
+
 import "./auth.css";
 
 const SignUp = () => {
-
-    const [countries] = useState(
-        Country.getAllCountries()
-    );
-
-    const [selectedCountry, setSelectedCountry] =
-    useState("");
-
+    const navigate = useNavigate();
+    const { login } = useAuth();
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState("");
     const [formData, setFormData] = useState({
-
-        firstname: "",
-        lastname: "",
-
-        day: "",
-        month: "",
-        year: "",
-
+        userName: "",
         email: "",
         password: "",
         confirmPassword: ""
     });
 
     const handleChange = (e) => {
-
         const { name, value } = e.target;
-
         setFormData((prev) => ({
             ...prev,
             [name]: value
         }));
     };
 
-    const handleCountryChange = (e) => {
-        setSelectedCountry(e.target.value);
-    };
-    const handleSubmit = (e) => {
+    const handleSubmit = async (e) => {
         e.preventDefault();
-        console.log({
-            ...formData,
-            country: selectedCountry
-        });
+        setError("");
+        if (formData.password !== formData.confirmPassword) {
+            return setError("Passwords do not match");
+        }
+
+        try {
+            setLoading(true);
+            const data = await signupUser({
+                userName: formData.userName,
+                email: formData.email,
+                password: formData.password
+            });
+
+            login(data);
+            navigate("/dashboard");
+        } catch (error) {
+            setError(error.response?.data?.message || "Signup failed");
+        } finally {
+            setLoading(false);
+        }
     };
 
     return (
@@ -53,16 +67,16 @@ const SignUp = () => {
                     CommitHub
                 </h1>
                 <h2 className="title">
-                    Build. Commit. Collaborate.
+                    Create your account.
                 </h2>
                 <p className="subtitle">
-                     Create your CommitHub account and
-                    start building your next generation
-                    projects with confidence.
+                    Build repositories,
+                    manage commits,
+                    and collaborate faster.
                 </p>
                 <p className="signin">
-                    Already part of CommitHub?
-                    <a href="/">
+                    Already have an account?
+                    <a href="/login">
                         {" "}Sign in →
                     </a>
                 </p>
@@ -70,145 +84,18 @@ const SignUp = () => {
                     className="form"
                     onSubmit={handleSubmit}
                 >
-                    {/* first&last */}
-                    <div className="firstlast">
-                        <div className="input-group">
-                            <input
-                                type="text"
-                                name="firstname"
-                                value={formData.firstname}
-                                onChange={handleChange}
-                                required
-                            />
-                            <label>
-                                First name
-                            </label>
-                        </div>
-                        <div className="input-group">
-                            <input
-                                type="text"
-                                name="lastname"
-                                value={formData.lastname}
-                                onChange={handleChange}
-                                required
-                            />
-                            <label>
-                                Last name
-                            </label>
-                        </div>
-                    </div>
-                    {/* country */}
-                    <div className="select-group">
-                        <select
-                            value={selectedCountry}
-                            onChange={handleCountryChange}
+                    <div className="input-group">
+                        <input
+                            type="text"
+                            name="userName"
+                            value={formData.userName}
+                            onChange={handleChange}
                             required
-                        >
-                            <option value="">
-                                Country / Region
-                            </option>
-                            {countries.map((c) => (
-                                <option
-                                    key={c.isoCode}
-                                    value={c.isoCode}
-                                >
-                                    {c.name}
-                                </option>
-                            ))}
-                        </select>
+                        />
+                        <label>
+                            Username
+                        </label>
                     </div>
-                    {/* DOB */}
-                    <div className="dob-section">
-                        <div className="dob-title">
-                            <span>
-                                Date of birth
-                            </span>
-                            <div className="info">
-                                ?
-                            </div>
-                        </div>
-                        <div className="dob-inputs">
-                            {/* day */}
-                            <select
-                                name="day"
-                                value={formData.day}
-                                onChange={handleChange}
-                                required
-                            >
-                                <option value="">
-                                    Day
-                                </option>
-                                {[...Array(31)].map((_, i) => (
-                                    <option
-                                        key={i + 1}
-                                        value={i + 1}
-                                    >
-                                        {i + 1}
-                                    </option>
-                                ))}
-                            </select>
-                            {/* month */}
-                            <select
-                                name="month"
-                                value={formData.month}
-                                onChange={handleChange}
-                                required
-                            >
-                                <option value="">
-                                    Month
-                                </option>
-                                {[
-                                    "January",
-                                    "February",
-                                    "March",
-                                    "April",
-                                    "May",
-                                    "June",
-                                    "July",
-                                    "August",
-                                    "September",
-                                    "October",
-                                    "November",
-                                    "December"
-                                ].map((m, i) => (
-
-                                    <option
-                                        key={i}
-                                        value={m}
-                                    >
-                                        {m}
-                                    </option>
-                                ))}
-                            </select>
-
-                            {/* year */}
-                            <select
-                                name="year"
-                                value={formData.year}
-                                onChange={handleChange}
-                                required
-                            >
-                                <option value="">
-                                    Year
-                                </option>
-                                {[...Array(100)].map((_, i) => {
-                                    const year =
-                                    new Date().getFullYear() - i;
-                                    return (
-                                        <option
-                                            key={year}
-                                            value={year}
-                                        >
-                                            {year}
-                                        </option>
-                                    );
-                                })}
-                            </select>
-                        </div>
-                    </div>
-                    <hr className="divider" />
-
-                    {/* email */}
                     <div className="input-group">
                         <input
                             type="email"
@@ -220,12 +107,8 @@ const SignUp = () => {
                         <label>
                             Email address
                         </label>
-
                     </div>
-
-                    {/* pwd */}
                     <div className="input-group">
-
                         <input
                             type="password"
                             name="password"
@@ -233,14 +116,10 @@ const SignUp = () => {
                             onChange={handleChange}
                             required
                         />
-
                         <label>
                             Password
                         </label>
-
                     </div>
-
-                    {/* confirm pwd*/}
                     <div className="input-group">
                         <input
                             type="password"
@@ -253,18 +132,26 @@ const SignUp = () => {
                             Confirm password
                         </label>
                     </div>
-
-                    {/* BUTTON */}
+                    {error && (
+                        <p className="auth-error">
+                            {error}
+                        </p>
+                    )}
                     <button
                         className="btn"
                         type="submit"
+                        disabled={loading}
                     >
-                        Create CommitHub Account
+                        {
+                            loading
+                            ? "Creating account..."
+                            : "Create CommitHub account"
+                        }
                     </button>
                 </form>
             </div>
         </div>
     );
 };
- 
+
 export default SignUp;
