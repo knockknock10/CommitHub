@@ -26,6 +26,7 @@ import Settings from "./pages/Settings";
 
 import ProtectedRoute from "./routes/ProtectedRoute";
 
+import CreateRepoModal from "./components/repo/CreateRepoModal";
 const App = () => {
 
     return (
@@ -35,7 +36,7 @@ const App = () => {
             <Routes>
 
                 <Route
-                    path="/CommitHub/"
+                    path="/"
                     element={<Landing />}
                 />
 
@@ -111,7 +112,14 @@ const App = () => {
                         </ProtectedRoute>
                     }
                 />
-
+                <Route
+                    path ="/new"
+                    element={
+                        <ProtectedRoute>
+                            <CreateRepoModal />
+                        </ProtectedRoute>
+                    }
+                />
             </Routes>
 
         </BrowserRouter>
