@@ -1,0 +1,249 @@
+.issues-page{
+    color: #c9d1d9;
+}
+
+/* header */
+
+.issues-header{
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
+    margin-bottom: 28px;
+}
+
+.issues-header h1{
+    color: #f0f6fc;
+    font-size: 34px;
+    margin-bottom: 10px;
+}
+
+.issues-header p{
+    color: #8b949e;
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+.new-issue-btn{
+    background: #238636;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 11px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.new-issue-btn:hover{
+    background: #2ea043;
+}
+
+/* toolbar */
+
+.issues-toolbar{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 18px;
+    margin-bottom: 18px;
+}
+
+.issues-toolbar input{
+    width: 100%;
+    max-width: 460px;
+    height: 42px;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    color: #c9d1d9;
+    padding: 0 14px;
+    outline: none;
+}
+
+.issues-toolbar input:focus{
+    border-color: #58a6ff;
+}
+
+/* filters */
+
+.issue-filters{
+    display: flex;
+    gap: 10px;
+}
+
+.issue-filters button{
+    background: #161b22;
+    color: #c9d1d9;
+    border: 1px solid #30363d;
+    border-radius: 8px;
+    padding: 9px 14px;
+    cursor: pointer;
+    text-transform: capitalize;
+}
+
+.issue-filters button:hover{
+    background: #21262d;
+}
+
+.active-issue-filter{
+    border-color: #58a6ff !important;
+    color: #58a6ff !important;
+}
+
+/* status */
+
+.issues-status-bar{
+    display: flex;
+    gap: 18px;
+    color: #8b949e;
+    font-size: 14px;
+    padding: 14px 16px;
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 10px 10px 0 0;
+}
+
+/* list */
+
+.issues-list{
+    border-left: 1px solid #30363d;
+    border-right: 1px solid #30363d;
+    border-bottom: 1px solid #30363d;
+    border-radius: 0 0 10px 10px;
+}
+
+.issue-row{
+    display: grid;
+    grid-template-columns: 18px minmax(0, 1fr) 120px;
+    gap: 14px;
+    padding: 18px 16px;
+    border-bottom: 1px solid #30363d;
+    align-items: flex-start;
+}
+
+.issue-row:last-child{
+    border-bottom: none;
+}
+
+.issue-row:hover{
+    background: #161b22;
+}
+
+/* status dot */
+
+.issue-status-dot{
+    width: 11px;
+    height: 11px;
+    border-radius: 50%;
+    margin-top: 6px;
+}
+
+.issue-status-dot.open{
+    background: #3fb950;
+}
+
+.issue-status-dot.closed{
+    background: #8957e5;
+}
+
+/* issue content */
+
+.issue-title-row{
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.issue-title-row h2{
+    color: #f0f6fc;
+    font-size: 16px;
+    font-weight: 600;
+}
+
+.issue-title-row h2:hover{
+    color: #58a6ff;
+    cursor: pointer;
+}
+
+.issue-main p{
+    color: #8b949e;
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+/* labels */
+
+.issue-label{
+    font-size: 11px;
+    font-weight: 600;
+    padding: 4px 8px;
+    border-radius: 999px;
+    text-transform: capitalize;
+}
+
+.issue-label.bug{
+    background: rgba(248,81,73,0.15);
+    color: #f85149;
+    border: 1px solid rgba(248,81,73,0.4);
+}
+
+.issue-label.feature{
+    background: rgba(88,166,255,0.15);
+    color: #58a6ff;
+    border: 1px solid rgba(88,166,255,0.4);
+}
+
+.issue-label.backend{
+    background: rgba(210,153,34,0.15);
+    color: #d29922;
+    border: 1px solid rgba(210,153,34,0.4);
+}
+
+.issue-label.enhancement{
+    background: rgba(137,87,229,0.15);
+    color: #a371f7;
+    border: 1px solid rgba(137,87,229,0.4);
+}
+
+/* comments */
+
+.issue-comments{
+    color: #8b949e;
+    font-size: 13px;
+    text-align: right;
+    white-space: nowrap;
+}
+
+/* responsive */
+
+@media(max-width: 850px){
+
+    .issues-header{
+        flex-direction: column;
+    }
+
+    .issues-toolbar{
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .issues-toolbar input{
+        max-width: 100%;
+    }
+
+    .issue-filters{
+        flex-wrap: wrap;
+    }
+
+    .issue-row{
+        grid-template-columns: 18px minmax(0, 1fr);
+    }
+
+    .issue-comments{
+        grid-column: 2;
+        text-align: left;
+    }
+}
