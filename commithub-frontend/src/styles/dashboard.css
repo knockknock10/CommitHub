@@ -1,0 +1,245 @@
+.dashboard-page{
+    color: #c9d1d9;
+}
+
+/* header */
+
+.dashboard-header{
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 24px;
+    margin-bottom: 28px;
+}
+
+.dashboard-header h1{
+    font-size: 34px;
+    color: #f0f6fc;
+    margin-bottom: 10px;
+}
+
+.dashboard-header p{
+    color: #8b949e;
+    font-size: 15px;
+    line-height: 1.6;
+}
+
+.new-repo-btn{
+    background: #238636;
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 11px 16px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.new-repo-btn:hover{
+    background: #2ea043;
+}
+
+/* summary */
+
+.dashboard-summary{
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+    margin-bottom: 28px;
+}
+
+.summary-card{
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 20px;
+}
+
+.summary-card span{
+    color: #8b949e;
+    font-size: 13px;
+    text-transform: capitalize;
+}
+
+.summary-card h3{
+    color: #f0f6fc;
+    font-size: 30px;
+    margin-top: 10px;
+}
+
+/* main layout */
+
+.dashboard-main-grid{
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 360px;
+    gap: 24px;
+}
+
+/* section */
+
+.repo-section,
+.activity-panel{
+    background: #0d1117;
+}
+
+.section-header{
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+}
+
+.section-header h2{
+    color: #f0f6fc;
+    font-size: 20px;
+}
+
+.section-header a{
+    color: #58a6ff;
+    font-size: 14px;
+}
+
+/* repositories */
+
+.repo-dashboard-list{
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.repo-dashboard-card{
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 20px;
+    transition: 0.2s ease;
+}
+
+.repo-dashboard-card:hover{
+    border-color: #58a6ff;
+}
+
+.repo-title-row{
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.repo-title-row h3{
+    color: #58a6ff;
+    font-size: 18px;
+    font-weight: 600;
+}
+
+.public,
+.private{
+    font-size: 11px;
+    font-weight: 600;
+    padding: 3px 8px;
+    border-radius: 999px;
+    text-transform: capitalize;
+}
+
+.public{
+    color: #3fb950;
+    border: 1px solid #238636;
+}
+
+.private{
+    color: #8b949e;
+    border: 1px solid #8b949e;
+}
+
+.repo-card-top p{
+    color: #8b949e;
+    font-size: 14px;
+    line-height: 1.6;
+}
+
+.repo-card-bottom{
+    display: flex;
+    flex-wrap: wrap;
+    gap: 18px;
+    margin-top: 18px;
+    color: #8b949e;
+    font-size: 13px;
+}
+
+/* activity */
+
+.activity-panel{
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 20px;
+    background: #161b22;
+}
+
+.activity-list{
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.activity-item{
+    display: flex;
+    gap: 14px;
+}
+
+.activity-dot{
+    width: 10px;
+    height: 10px;
+    background: #238636;
+    border-radius: 50%;
+    margin-top: 7px;
+    flex-shrink: 0;
+}
+
+.activity-item h4{
+    color: #f0f6fc;
+    font-size: 14px;
+    margin-bottom: 6px;
+}
+
+.activity-item p{
+    color: #8b949e;
+    font-size: 13px;
+    line-height: 1.5;
+    margin-bottom: 6px;
+}
+
+.activity-item span{
+    color: #6e7681;
+    font-size: 12px;
+}
+
+/* responsive */
+
+@media(max-width: 1100px){
+
+    .dashboard-main-grid{
+        grid-template-columns: 1fr;
+    }
+}
+
+@media(max-width: 800px){
+
+    .dashboard-header{
+        flex-direction: column;
+    }
+
+    .dashboard-summary{
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media(max-width: 520px){
+
+    .dashboard-summary{
+        grid-template-columns: 1fr;
+    }
+
+    .repo-card-bottom{
+        gap: 12px;
+    }
+}
