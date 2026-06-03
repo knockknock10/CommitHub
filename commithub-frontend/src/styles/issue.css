@@ -1,0 +1,97 @@
+.issue-card{
+    background:#161b22;
+    border:1px solid #30363d;
+    border-radius:10px;
+    padding:18px;
+    margin-bottom:16px;
+}
+
+.issue-card-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:12px;
+}
+
+.issue-card-header h3{
+    margin:0;
+    font-size:1rem;
+}
+
+.issue-card-header span{
+    padding:4px 10px;
+    border-radius:20px;
+    font-size:.8rem;
+    font-weight:600;
+}
+
+.issue-card-header span.open{
+    background:#238636;
+    color:white;
+}
+
+.issue-card-header span.closed{
+    background:#da3633;
+    color:white;
+}
+
+.issue-card p{
+    color:#8b949e;
+    margin-bottom:12px;
+}
+
+.issue-card-footer{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    font-size:.85rem;
+    color:#8b949e;
+}
+
+.create-issue-card{
+    background:#161b22;
+    border:1px solid #30363d;
+    border-radius:10px;
+    padding:20px;
+    margin-bottom:20px;
+}
+
+.create-issue-card h2{
+    margin-bottom:16px;
+}
+
+.create-issue-card form{
+    display:flex;
+    flex-direction:column;
+    gap:12px;
+}
+
+.create-issue-card input,
+.create-issue-card textarea,
+.create-issue-card select{
+    background:#0d1117;
+    border:1px solid #30363d;
+    color:white;
+    padding:12px;
+    border-radius:8px;
+    outline:none;
+}
+
+.create-issue-card textarea{
+    min-height:120px;
+    resize:vertical;
+}
+
+.create-issue-card button{
+    background:#238636;
+    color:white;
+    border:none;
+    padding:12px;
+    border-radius:8px;
+    cursor:pointer;
+    font-weight:600;
+}
+
+.create-issue-card button:hover{
+    background:#2ea043;
+}
