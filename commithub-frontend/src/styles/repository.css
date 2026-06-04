@@ -1,0 +1,113 @@
+.repository-page{
+    max-width:1200px;
+    margin:0 auto;
+    padding:32px;
+    color:white;
+}
+
+.repository-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-start;
+    margin-bottom:32px;
+}
+
+.repository-header h1{
+    font-size:2rem;
+    margin-bottom:8px;
+}
+
+.repository-header p{
+    color:#8b949e;
+}
+
+.visibility-badge{
+    padding:6px 14px;
+    border-radius:20px;
+    font-size:.85rem;
+    font-weight:600;
+}
+
+.visibility-badge.public{
+    background:#238636;
+    color:white;
+}
+
+.visibility-badge.private{
+    background:#30363d;
+    color:white;
+}
+
+.repository-stats{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:20px;
+    margin-bottom:32px;
+}
+
+.stat-card{
+    background:#161b22;
+    border:1px solid #30363d;
+    border-radius:12px;
+    padding:20px;
+}
+
+.stat-card span{
+    color:#8b949e;
+    font-size:.9rem;
+}
+
+.stat-card h3{
+    margin-top:10px;
+    font-size:1.8rem;
+}
+
+.repository-tabs{
+    display:flex;
+    gap:12px;
+    margin-bottom:30px;
+}
+
+.repository-tabs button{
+    border:none;
+    background:#21262d;
+    color:white;
+    padding:10px 16px;
+    border-radius:8px;
+    cursor:pointer;
+}
+
+.repository-content{
+    display:flex;
+    flex-direction:column;
+    gap:24px;
+}
+
+.repository-section{
+    background:#161b22;
+    border:1px solid #30363d;
+    border-radius:12px;
+    padding:24px;
+}
+
+.repository-section h2{
+    margin-bottom:16px;
+}
+
+.branch-list{
+    display:flex;
+    gap:12px;
+    flex-wrap:wrap;
+}
+
+.branch-card{
+    background:#21262d;
+    padding:10px 16px;
+    border-radius:8px;
+}
+
+.repo-info-grid{
+    display:grid;
+    grid-template-columns:repeat(3,1fr);
+    gap:20px;
+}
