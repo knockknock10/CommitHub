@@ -93,7 +93,11 @@ const Dashboard = () => {
                         {error && <p>{error}</p>}
                         <div className="repo-dashboard-list">
                             {repositories.map((repo) => (
-                                <div className="repo-dashboard-card" key={repo._id}>
+                                <div
+                                    className="repo-dashboard-card"
+                                    key={repo._id}
+                                    onClick={() => navigate(`/repo/${repo._id}`)}
+                                >
                                     <div className="repo-card-top">
                                         <div>
                                             <div className="repo-title-row">
