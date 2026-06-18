@@ -1,0 +1,227 @@
+.repo-preview{
+
+    width: 100%;
+
+    padding: 120px 24px;
+
+    background: #0d1117;
+}
+
+/* header */
+
+.repo-preview-header{
+
+    max-width: 760px;
+
+    margin: 0 auto;
+
+    text-align: center;
+
+    margin-bottom: 70px;
+}
+
+/* top text */
+
+.repo-tag{
+
+    color: #58a6ff;
+
+    font-size: 14px;
+
+    font-weight: 600;
+
+    text-transform: uppercase;
+
+    letter-spacing: 1px;
+
+    margin-bottom: 18px;
+}
+
+/* title */
+
+.repo-title{
+
+    font-size: 52px;
+
+    line-height: 1.1;
+
+    letter-spacing: -2px;
+
+    color: white;
+
+    margin-bottom: 24px;
+}
+
+/* desc */
+
+.repo-description{
+
+    font-size: 18px;
+
+    line-height: 1.8;
+
+    color: #8b949e;
+}
+
+/* repo list */
+
+.repo-list{
+
+    max-width: 1100px;
+
+    margin: 0 auto;
+
+    display: flex;
+
+    flex-direction: column;
+
+    gap: 22px;
+}
+
+/* repo card */
+
+.repo-item{
+
+    background: #161b22;
+
+    border: 1px solid #30363d;
+
+    border-radius: 18px;
+
+    padding: 28px;
+
+    transition: 0.2s ease;
+}
+
+/* hover */
+
+.repo-item:hover{
+
+    border-color: #58a6ff;
+}
+
+/* repo row */
+
+.repo-name-row{
+
+    display: flex;
+
+    align-items: center;
+
+    gap: 14px;
+
+    margin-bottom: 14px;
+}
+
+/* repo name */
+
+.repo-name-row h3{
+
+    color: #58a6ff;
+
+    font-size: 22px;
+
+    font-weight: 600;
+}
+
+/* visibility */
+
+.public,
+.private{
+
+    font-size: 12px;
+
+    font-weight: 600;
+
+    padding: 5px 10px;
+
+    border-radius: 999px;
+}
+
+/* public */
+
+.public{
+
+    border: 1px solid #238636;
+
+    color: #3fb950;
+}
+
+/* private */
+
+.private{
+
+    border: 1px solid #8b949e;
+
+    color: #8b949e;
+}
+
+/* description */
+
+.repo-desc{
+
+    color: #8b949e;
+
+    font-size: 15px;
+
+    line-height: 1.7;
+}
+
+/* bottom */
+
+.repo-bottom{
+
+    display: flex;
+
+    flex-wrap: wrap;
+
+    gap: 24px;
+
+    margin-top: 24px;
+
+    color: #8b949e;
+
+    font-size: 14px;
+}
+
+/* responsive */
+
+@media(max-width: 900px){
+
+    .repo-title{
+
+        font-size: 40px;
+    }
+}
+
+@media(max-width: 600px){
+
+    .repo-preview{
+
+        padding: 90px 20px;
+    }
+
+    .repo-title{
+
+        font-size: 30px;
+    }
+
+    .repo-item{
+
+        padding: 22px;
+    }
+
+    .repo-name-row{
+
+        flex-direction: column;
+
+        align-items: flex-start;
+
+        gap: 10px;
+    }
+
+    .repo-bottom{
+
+        gap: 14px;
+    }
+}
