@@ -1,5 +1,6 @@
 import Repository from "../models/repoModel.js";
-
+export const starRepository = async(req,res)=>{}
+export const unstarRepository = async(req,res)=>{}
 /* create repository */
 export const createRepository = async (req, res) => {
     try {
@@ -54,3 +55,22 @@ export const getRepositories = async (req, res) => {
         });
     }
 };
+//fetch repo by id
+export const getRepositoryById = async (req,res) => {
+    try{
+        const repository = await Repository.findOne({
+            _id: req.params.id,
+            owner: req.user._id // so here now only user a can access it a all repo not of user b repo
+        })
+        if(!repository){
+            return res.status(404).json({
+                message:"Repository not found"
+            })
+        }
+        res.status(200).json(repository);
+    }catch(error){
+        res.status(500).json({
+            message:error.message
+        });
+    }
+}
