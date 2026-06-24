@@ -38,6 +38,10 @@ const IssueSchema = new Schema(
         author: {
             type: Schema.Types.ObjectId,
             ref: "User"
+        },
+        assignee: {
+        type: Schema.Types.ObjectId,ref: "User",
+        default: null
         }
     },
     {
