@@ -1,10 +1,10 @@
-# 🎵 SemBind-Audio
+# SemBind-Audio
 
 > **Semantic-Aware Zero-Trust Audio Watermarking using Transformer-based Audio Representations and Cryptographic Binding**
 
 ---
 
-# 📌 Research Overview
+# Research Overview
 
 SemBind-Audio is an ongoing research project investigating whether modern Transformer-based audio foundation models can be used to improve digital audio watermarking.
 
@@ -14,7 +14,7 @@ The research is currently focused on experimentally validating each design assum
 
 ---
 
-# 🎯 Research Motivation
+#  Research Motivation
 
 Digital audio watermarking has been studied for several decades. Most existing watermarking methods determine embedding locations using:
 
@@ -36,7 +36,7 @@ This raises an important research question:
 
 ---
 
-# ❓ Research Questions
+#  Research Questions
 
 The research is divided into multiple experimental questions.
 
@@ -88,7 +88,7 @@ Can transformer-derived semantic information guide adaptive watermark embedding?
 
 ---
 
-# 🎯 Final Objective
+#  Final Objective
 
 The final goal of SemBind-Audio is to design a semantic-aware zero-trust audio watermarking framework capable of:
 
@@ -101,7 +101,7 @@ The final goal of SemBind-Audio is to design a semantic-aware zero-trust audio w
 
 ---
 
-# 🏗 Current Research Pipeline
+#  Current Research Pipeline
 
 ```
                      Input Audio
@@ -133,7 +133,7 @@ The final goal of SemBind-Audio is to design a semantic-aware zero-trust audio w
 
 ---
 
-# 📚 Literature Survey Summary
+#  Literature Survey Summary
 
 The literature survey covered the following research areas:
 
@@ -185,7 +185,7 @@ The literature survey covered the following research areas:
 
 ---
 
-# 🔍 Research Gap
+#  Research Gap
 
 The literature survey indicates that existing adaptive watermarking methods generally rely on:
 
@@ -211,7 +211,7 @@ This README documents every experiment performed throughout the research.
 
 ---
 
-# 🧪 Experimental Methodology
+#  Experimental Methodology
 
 The research was conducted experimentally rather than directly implementing a watermarking algorithm. Each assumption behind the proposed framework was validated individually before proceeding to the next stage.
 
@@ -262,7 +262,7 @@ Adaptive Watermark Embedding Design
 
 ---
 
-# 💻 Experimental Environment
+#  Experimental Environment
 
 ## Hardware
 
@@ -302,7 +302,7 @@ FFmpeg
 
 ---
 
-# 📂 Datasets
+#  Datasets
 
 Two datasets were used.
 
@@ -334,7 +334,7 @@ Example utterances:
 
 ---
 
-# 🧪 Experiment 1
+# Experiment 1
 
 # Selecting the Semantic Audio Model
 
@@ -434,7 +434,7 @@ HuBERT was selected as the semantic encoder for all subsequent experiments.
 
 ---
 
-# 🧪 Experiment 2
+#  Experiment 2
 
 # Robustness of Semantic Embeddings
 
@@ -505,7 +505,7 @@ This makes them suitable candidates for semantic fingerprint generation.
 
 ---
 
-# 🧪 Experiment 3
+#  Experiment 3
 
 # Semantic Fingerprint Generation
 
@@ -605,7 +605,7 @@ Semantic fingerprints appear to be a promising watermark payload because they en
 
 ---
 
-# 🧪 Experiment 4
+#  Experiment 4
 
 # Cryptographic Binding Validation
 
@@ -675,7 +675,7 @@ The semantic fingerprint can be securely transformed into a cryptographic waterm
 
 ---
 
-# 🧪 Experiment 5
+#  Experiment 5
 
 # Fingerprint Robustness (BER Analysis)
 
@@ -745,7 +745,7 @@ The semantic fingerprint demonstrates promising robustness under realistic audio
 
 ---
 
-# 🧪 Experiment 6
+#  Experiment 6
 
 # Spectrogram Patch Analysis
 
@@ -865,7 +865,7 @@ However, this alone does not establish novelty.
 
 ---
 
-# 🧪 Experiment 7
+#  Experiment 7
 
 # Energy vs Semantic Comparison
 
@@ -947,7 +947,7 @@ This negative result is important because it prevents making an unsupported nove
 
 ---
 
-# 🧪 Experiment 8
+# Experiment 8
 
 # Transformer Layer Analysis
 
@@ -1018,7 +1018,7 @@ This hypothesis will be validated in future experiments.
 
 ---
 
-# 📊 Summary of Experiments
+# Summary of Experiments
 
 | Experiment | Objective                  | Status |
 | ---------- | -------------------------- | ------ |
@@ -1033,7 +1033,7 @@ This hypothesis will be validated in future experiments.
 
 ---
 
-# 🔍 Current Findings
+#  Current Findings
 
 ## Successfully Demonstrated
 
@@ -1054,7 +1054,7 @@ This hypothesis will be validated in future experiments.
 
 ---
 
-# ⚠ Current Research Position
+#  Current Research Position
 
 At the current stage, no novelty claim is being made.
 
@@ -1064,7 +1064,7 @@ The research now focuses on determining whether transformer-derived semantic inf
 
 ---
 
-# 🚀 Next Planned Experiments
+#  Next Planned Experiments
 
 1. Layer-wise Spectrogram Patch Analysis
 2. Semantic Stability under MP3 Compression
