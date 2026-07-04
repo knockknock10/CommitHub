@@ -10,9 +10,13 @@ export const createIssue = async (repoId,issueData)=>{
 }
 export const closeIssue = async (issueId)=>{
     const response = await api.patch(`/issues/${issueId}/close`);
-    return response.data;
+    return response.data;   
 }
 export const reopenIssue = async (issueId)=>{
     const response = await api.patch(`/issues/${issueId}/reopen`);
     return response.data;
 }
+export const getIssueById = async (issueId) => {
+    const response = await api.get(`/issues/${issueId}`);
+    return response.data;
+};
