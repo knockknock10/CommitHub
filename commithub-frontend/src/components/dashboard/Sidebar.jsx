@@ -1,21 +1,16 @@
 import { NavLink } from "react-router-dom";
-
+import { useNavigate } from "react-router-dom";
 import "../../styles/sidebar.css";
 
 const Sidebar = () => {
-
+    const navigate = useNavigate();
     return (
 
         <aside className="sidebar">
-
-            <div className="sidebar-logo">
-
+            <div className="sidebar-logo" onClick={()=>navigate(`/dashboard/`)}>
                 CommitHub
-
             </div>
-
             <nav className="sidebar-nav">
-
                 <NavLink
                     to="/dashboard"
                     className={({ isActive }) =>
@@ -24,7 +19,6 @@ const Sidebar = () => {
                 >
                     overview
                 </NavLink>
-
                 <NavLink
                     to="/repositories"
                     className={({ isActive }) =>
@@ -33,7 +27,6 @@ const Sidebar = () => {
                 >
                     repositories
                 </NavLink>
-
                 <NavLink
                     to="/issues"
                     className={({ isActive }) =>
@@ -42,7 +35,6 @@ const Sidebar = () => {
                 >
                     issues
                 </NavLink>
-
                 <NavLink
                     to="/pull-requests"
                     className={({ isActive }) =>
@@ -51,7 +43,6 @@ const Sidebar = () => {
                 >
                     pull requests
                 </NavLink>
-
                 <NavLink
                     to="/activity"
                     className={({ isActive }) =>
@@ -60,7 +51,6 @@ const Sidebar = () => {
                 >
                     activity
                 </NavLink>
-
                 <NavLink
                     to="/settings"
                     className={({ isActive }) =>
@@ -69,9 +59,7 @@ const Sidebar = () => {
                 >
                     settings
                 </NavLink>
-
             </nav>
-
         </aside>
     );
 };
