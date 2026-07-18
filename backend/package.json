@@ -2,10 +2,11 @@
   "name": "backend",
   "version": "1.0.0",
   "description": "CommitHub – A lightweight personal version control system for managing commits, branches, and merges with a local and collaborative workflow. Designed to teach and demonstrate Git-like functionality in a clean, developer-friendly CLI.",
-  "main": "index.js",
+  "main": "server.js",
   "type": "module",
   "scripts": {
-    "start": "node index.js",
+    "dev": "nodemon server.js",
+    "start": "node server.js",
     "test": "echo \"No tests yet\" && exit 0"
   },
   "keywords": [
