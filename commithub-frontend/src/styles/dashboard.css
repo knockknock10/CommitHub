@@ -223,23 +223,22 @@
 }
 
 @media(max-width: 800px){
-
     .dashboard-header{
         flex-direction: column;
     }
-
     .dashboard-summary{
         grid-template-columns: repeat(2, 1fr);
     }
 }
 
 @media(max-width: 520px){
-
     .dashboard-summary{
         grid-template-columns: 1fr;
     }
-
     .repo-card-bottom{
         gap: 12px;
     }
+}
+.repo-dashboard-list{
+    cursor: pointer;
 }
