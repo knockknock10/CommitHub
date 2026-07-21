@@ -95,3 +95,78 @@
 .create-issue-card button:hover{
     background:#2ea043;
 }
+.comment-form{
+    margin-top:20px;
+    margin-bottom:20px;
+}
+
+.comment-form textarea{
+    width:100%;
+    min-height:100px;
+    padding:12px;
+    border-radius:8px;
+    border:1px solid #30363d;
+    background:#0d1117;
+    color:#f0f6fc;
+    caret-color:#f0f6fc;
+    resize:vertical;
+    outline:none;
+    font-size:14px;
+    font-family:inherit;
+}
+
+.comment-form textarea::placeholder{
+    color:#8b949e;
+}
+
+.comment-form textarea:focus{
+    border-color:#58a6ff;
+    box-shadow:0 0 0 3px rgba(88,166,255,.15);
+}
+
+.comment-form button{
+    margin-top:10px;
+    background:#238636;
+    border:none;
+    color:white;
+    padding:10px 16px;
+    border-radius:8px;
+    cursor:pointer;
+    font-weight:600;
+    transition:.2s;
+}
+
+.comment-form button:hover{
+    background:#2ea043;
+}
+
+.comment-card{
+    background:#161b22;
+    border:1px solid #30363d;
+    border-radius:10px;
+    padding:16px;
+    margin-bottom:12px;
+    color:#f0f6fc;
+}
+
+.comment-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:10px;
+}
+
+.comment-header strong{
+    color:#f0f6fc;
+}
+
+.comment-header span{
+    color:#8b949e;
+    font-size:.9rem;
+}
+
+.comment-card p{
+    margin:0;
+    color:#c9d1d9;
+    line-height:1.6;
+}
