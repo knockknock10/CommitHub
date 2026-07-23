@@ -40,17 +40,38 @@ export const createRepository = async (req, res) => {
 };
 
 /* get repositories */
+// export const getRepositories = async (req, res) => {
+//     try {
+//         const repositories = await Repository.find({
+//             owner: req.user._id
+//         }).sort({
+//             createdAt: -1
+//         });
+
+//         res.status(200).json(repositories);
+//     } catch (error) {
+//         res.status(500).json({
+//             message: error.message
+//         });
+//     }
+// };
 export const getRepositories = async (req, res) => {
     try {
+        console.log("===== getRepositories CALLED =====");
+        console.log("req.user =", req.user);
+
         const repositories = await Repository.find({
             owner: req.user._id
-        }).sort({
-            createdAt: -1
         });
 
-        res.status(200).json(repositories);
+        console.log("repositories =", repositories);
+
+        return res.status(200).json(repositories);
+
     } catch (error) {
-        res.status(500).json({
+        console.error("getRepositories ERROR:", error);
+
+        return res.status(500).json({
             message: error.message
         });
     }
