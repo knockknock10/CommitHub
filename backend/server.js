@@ -7,7 +7,7 @@ import repositoryRoutes from "./routes/repositoryRoutes.js";
 import issueRoutes from "./routes/issueRoutes.js";
 import commentRoutes from "./routes/commentRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
-
+import searchRoutes from "./routes/searchRoutes.js";
 
 dotenv.config();
 
@@ -28,6 +28,11 @@ app.use("/api/issues",issueRoutes);
 
 app.use("/api/comments",commentRoutes);
 app.use("/api/users",userRoutes);
+
+app.use(
+    "/api/search",
+    searchRoutes
+);
 
 app.get("/", (req, res) => {
     res.send("CommitHub API running");
