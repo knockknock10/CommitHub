@@ -23,33 +23,29 @@ app.use(cors());
 
 app.use("/api/auth", authRoutes);
 
-app.use("/api/repositories",repositoryRoutes);
-app.use("/api/issues",issueRoutes);
+app.use("/api/repositories", repositoryRoutes);
+app.use("/api/issues", issueRoutes);
 
-app.use("/api/comments",commentRoutes);
-app.use("/api/users",userRoutes);
+app.use("/api/comments", commentRoutes);
+app.use("/api/users", userRoutes);
 
 app.use(
     "/api/search",
     searchRoutes
 );
-
 app.get("/", (req, res) => {
     res.send("CommitHub API running");
 });
-
-
 const PORT = process.env.PORT || 3000;
-
 const startServer = async () => {
-    try{
+    try {
         await connectDB();
         app.listen(PORT, () => {
             console.log(
                 `Server running on port ${PORT}`
             );
         });
-    }catch(error){
+    } catch (error) {
         console.error(error);
     }
 };
