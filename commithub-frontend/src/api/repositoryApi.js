@@ -33,3 +33,16 @@ export const unstarRepository = async(id)=>{
     );
     return response.data;
 }
+export const updateRepository = async(id,data)=>{
+    const response = await api.patch(
+        `/repositories/${id}`,
+        data
+    );
+    return response.data;
+}
+export const deleteRepository = async(id)=>{
+    const response = await api.delete(
+        `/repositories/${id}`
+    );
+    return response.data;
+}
