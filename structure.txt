@@ -1,0 +1,69 @@
+.
+├── Readme.md
+├── backend
+│   ├── config
+│   │   ├── aws-config.js
+│   │   └── db.js
+│   ├── controllers
+│   │   ├── add.js
+│   │   ├── authController.js
+│   │   ├── branch.js
+│   │   ├── checkout.js
+│   │   ├── commit.js
+│   │   ├── init.js
+│   │   ├── log.js
+│   │   ├── merge.js
+│   │   ├── pull.js
+│   │   ├── push.js
+│   │   ├── remote.js
+│   │   ├── remoteAdd.js
+│   │   ├── revert.js
+│   │   └── status.js
+│   ├── index.js
+│   ├── middleware
+│   │   ├── authmiddleware.js
+│   │   └── authorisemiddleware.js
+│   ├── models
+│   │   ├── issueMode.js
+│   │   ├── repoModel.js
+│   │   └── userModel.js
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── routes
+│   │   └── auth.js
+│   ├── server.js
+│   └── utils
+│       ├── fileWalker.js
+│       └── generateToken.js
+├── commithub-frontend
+│   ├── README.md
+│   ├── eslint.config.js
+│   ├── index.html
+│   ├── package-lock.json
+│   ├── package.json
+│   ├── public
+│   │   ├── favicon.svg
+│   │   └── icons.svg
+│   ├── src
+│   │   ├── App.css
+│   │   ├── App.jsx
+│   │   ├── assets
+│   │   │   ├── hero.png
+│   │   │   ├── react.svg
+│   │   │   └── vite.svg
+│   │   ├── components
+│   │   │   ├── auth
+│   │   │   │   ├── Login.jsx
+│   │   │   │   ├── SignUp.jsx
+│   │   │   │   ├── auth.css
+│   │   │   │   └── login.css
+│   │   │   ├── dashboard
+│   │   │   ├── issue
+│   │   │   └── repo
+│   │   ├── index.css
+│   │   └── main.jsx
+│   └── vite.config.js
+├── package.json
+└── structure.txt
+
+17 directories, 50 files
