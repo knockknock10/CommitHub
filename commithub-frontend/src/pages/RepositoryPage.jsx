@@ -1,6 +1,6 @@
 import DashboardLayout from "../components/dashboard/DashboardLayout";
 import { useParams } from "react-router-dom";
-import { fetchRepositoryById } from "../api/repositoryApi";
+import { fetchRepositoryById, starRepository, unstarRepository } from "../api/repositoryApi";
 import { useEffect, useState } from "react";
 import IssueList from "../components/issue/IssueList";
 import "../styles/repository.css";
@@ -12,12 +12,16 @@ const RepositoryPage = () => {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
     const [activeTab, setActiveTab] = useState("code");
+    const [starred, setStarred] = useState(false);
+    const [starCount, setStarCount] = useState(0);
 
     useEffect(() => {
         const loadRepository = async () => {
             try {
                 const data = await fetchRepositoryById(id);
                 setRepository(data);
+                setStarred(data.isStarred);
+                setStarCount(data.stars);
             } catch (error) {
                 setError(
                     `Failed to load repository: ${error.message}`
@@ -28,6 +32,23 @@ const RepositoryPage = () => {
         };
         loadRepository();
     }, [id]);
+
+    const handleStarToggle = async () => {
+        try {
+            if (starred) {
+                const data = await unstarRepository(repository._id);
+                setStarred(false);
+                setStarCount(data.stars);
+            } else {
+                const data = await starRepository(repository._id);
+                setStarred(true);
+                setStarCount(data.stars);
+            }
+        } catch (error) {
+            console.log(error);
+        }
+    };
+
     if (loading) {
         return (
             <DashboardLayout>
@@ -54,11 +75,19 @@ const RepositoryPage = () => {
                         <h1>{repository.name}</h1>
                         <p>{repository.description}</p>
                     </div>
-                    <span
-                        className={`visibility-badge ${repository.visibility}`}
-                    >
-                        {repository.visibility}
-                    </span>
+                    <div className="repository-header-actions">
+                        <button
+                            className={`star-btn ${starred ? "starred" : ""}`}
+                            onClick={handleStarToggle}
+                        >
+                            {starred ? "★" : "☆"} Star {starCount}
+                        </button>
+                        <span
+                            className={`visibility-badge ${repository.visibility}`}
+                        >
+                            {repository.visibility}
+                        </span>
+                    </div>
                 </div>
                 <div className="repository-stats">
                     <div className="stat-card">
