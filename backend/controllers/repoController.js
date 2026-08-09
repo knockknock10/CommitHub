@@ -1,6 +1,8 @@
 import mongoose from "mongoose";
 import User from "../models/userModel.js";
 import Repository from "../models/repoModel.js";
+import Issue from "../models/issueMode.js";
+import Comment from "../models/commentModel.js";
 
 /* star repository */
 export const starRepository = async (req, res) => {
@@ -207,7 +209,8 @@ export const getRepositoryById = async (req,res) => {
         if (repository.visibility === "public" || isOwner) {
             return res.status(200).json({
                 ...repository.toObject(),
-                isStarred
+                isStarred,
+                isOwner
             });
         }
 
@@ -220,3 +223,158 @@ export const getRepositoryById = async (req,res) => {
         });
     }
 }
+
+/* update repository */
+export const updateRepository = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({
+                message: "Invalid repository ID"
+            });
+        }
+
+        const repository = await Repository.findById(id);
+
+        if (!repository) {
+            return res.status(404).json({
+                message: "Repository not found"
+            });
+        }
+
+        const isOwner =
+            repository.owner.toString() === req.user._id.toString();
+
+        if (!isOwner) {
+            return res.status(403).json({
+                message: "You do not have access to this repository"
+            });
+        }
+
+        const { name, description, visibility } = req.body;
+
+        const updates = {};
+
+        if (name !== undefined) {
+            if (typeof name !== "string" || name.trim() === "") {
+                return res.status(400).json({
+                    message: "Repository name must be a non-empty string"
+                });
+            }
+
+            const nameTaken = await Repository.findOne({
+                name,
+                owner: req.user._id,
+                _id: { $ne: repository._id }
+            });
+
+            if (nameTaken) {
+                return res.status(400).json({
+                    message: "Repository already exists"
+                });
+            }
+
+            updates.name = name;
+        }
+
+        if (description !== undefined) {
+            if (typeof description !== "string") {
+                return res.status(400).json({
+                    message: "Description must be a string"
+                });
+            }
+
+            updates.description = description;
+        }
+
+        if (visibility !== undefined) {
+            if (visibility !== "public" && visibility !== "private") {
+                return res.status(400).json({
+                    message: "Visibility must be public or private"
+                });
+            }
+
+            updates.visibility = visibility;
+        }
+
+        if (Object.keys(updates).length === 0) {
+            return res.status(400).json({
+                message: "No valid fields to update"
+            });
+        }
+
+        repository.set(updates);
+
+        await repository.save();
+
+        await repository.populate("owner", "userName email");
+
+        return res.status(200).json(repository);
+    }catch(error){
+        return res.status(500).json({
+            message: "Server error"
+        });
+    }
+};
+
+/* delete repository */
+export const deleteRepository = async (req, res) => {
+    try {
+        const { id } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(id)) {
+            return res.status(400).json({
+                message: "Invalid repository ID"
+            });
+        }
+
+        const repository = await Repository.findById(id);
+
+        if (!repository) {
+            return res.status(404).json({
+                message: "Repository not found"
+            });
+        }
+
+        const isOwner =
+            repository.owner.toString() === req.user._id.toString();
+
+        if (!isOwner) {
+            return res.status(403).json({
+                message: "You do not have access to this repository"
+            });
+        }
+
+        const issues = await Issue.find({
+            repository: repository._id
+        });
+
+        const issueIds = issues.map((issue) => issue._id);
+
+        await Comment.deleteMany({
+            issue: { $in: issueIds }
+        });
+
+        await Issue.deleteMany({
+            repository: repository._id
+        });
+
+        await User.updateMany({}, {
+            $pull: {
+                starRepo: repository._id,
+                repositories: repository._id
+            }
+        });
+
+        await Repository.findByIdAndDelete(repository._id);
+
+        return res.status(200).json({
+            message: "Repository deleted"
+        });
+    }catch(error){
+        return res.status(500).json({
+            message: "Server error"
+        });
+    }
+};
