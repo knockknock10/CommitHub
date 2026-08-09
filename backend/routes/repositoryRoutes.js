@@ -2,10 +2,12 @@ import express from "express";
 import protect from "../middleware/authmiddleware.js";
 import {
     createRepository,
+    deleteRepository,
     getRepositories,
     getRepositoryById,
     starRepository,
-    unstarRepository
+    unstarRepository,
+    updateRepository
 } from "../controllers/repoController.js";
 
 const router = express.Router();
@@ -15,7 +17,9 @@ router.route("/")
 .get(protect, getRepositories);
 
 router.route("/:id")
-.get(protect, getRepositoryById);
+.get(protect, getRepositoryById)
+.patch(protect, updateRepository)
+.delete(protect, deleteRepository);
 
 router.route("/:id/star")
 .patch(protect, starRepository);
