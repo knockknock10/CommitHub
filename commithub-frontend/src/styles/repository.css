@@ -21,6 +21,27 @@
     color:#8b949e;
 }
 
+.repository-header-actions{
+    display:flex;
+    align-items:center;
+    gap:12px;
+}
+
+.star-btn{
+    border:1px solid #30363d;
+    background:#21262d;
+    color:white;
+    padding:8px 16px;
+    border-radius:8px;
+    cursor:pointer;
+}
+
+.star-btn.starred{
+    background:#f0b429;
+    color:#161b22;
+    border-color:#f0b429;
+}
+
 .visibility-badge{
     padding:6px 14px;
     border-radius:20px;
