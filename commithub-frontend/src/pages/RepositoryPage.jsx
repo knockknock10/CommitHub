@@ -3,6 +3,7 @@ import { useParams } from "react-router-dom";
 import { fetchRepositoryById, starRepository, unstarRepository } from "../api/repositoryApi";
 import { useEffect, useState } from "react";
 import IssueList from "../components/issue/IssueList";
+import RepositorySettings from "../components/repo/RepositorySettings";
 import "../styles/repository.css";
 
 const RepositoryPage = () => {
@@ -47,6 +48,11 @@ const RepositoryPage = () => {
         } catch (error) {
             console.log(error);
         }
+    };
+
+    const handleRepositoryUpdated = (updated) => {
+        setRepository(updated);
+        setStarCount(updated.stars);
     };
 
     if (loading) {
@@ -107,7 +113,9 @@ const RepositoryPage = () => {
                     <button onClick={() =>setActiveTab("code")}>Code</button>
                     <button onClick={() =>setActiveTab("issues")}>Issues</button>
                     <button onClick={() =>setActiveTab("branches")}>Branches</button>
-                    <button onClick={() =>setActiveTab("settings")}>Settings</button>
+                    {repository.isOwner && (
+                        <button onClick={() =>setActiveTab("settings")}>Settings</button>
+                    )}
                 </div>
                 <div className="repository-content">
                     {activeTab === "code" && (
@@ -141,33 +149,39 @@ const RepositoryPage = () => {
                         </div>
                     )}
                     {activeTab === "settings" && (
-                        <div className="repository-section">
-                            <h2>
-                                Repository Information</h2>
-                            <div className="repo-info-grid">
-                                <div>
-                                    <strong>
-                                        Visibility
-                                    </strong>
-                                    <p>
-                                        {repository.visibility}</p>
-                                </div>
-                                <div>
-                                    <strong>Created</strong>
-                                    <p>
-                                        {new Date(repository.createdAt).toLocaleDateString()}
-                                    </p>
-                                </div>
-                                <div>
-                                    <strong>
-                                        Updated
-                                    </strong>
-                                    <p>
-                                        {new Date(repository.updatedAt).toLocaleDateString()}
-                                    </p>
+                        <>
+                            <div className="repository-section">
+                                <h2>
+                                    Repository Information</h2>
+                                <div className="repo-info-grid">
+                                    <div>
+                                        <strong>
+                                            Visibility
+                                        </strong>
+                                        <p>
+                                            {repository.visibility}</p>
+                                    </div>
+                                    <div>
+                                        <strong>Created</strong>
+                                        <p>
+                                            {new Date(repository.createdAt).toLocaleDateString()}
+                                        </p>
+                                    </div>
+                                    <div>
+                                        <strong>
+                                            Updated
+                                        </strong>
+                                        <p>
+                                            {new Date(repository.updatedAt).toLocaleDateString()}
+                                        </p>
+                                    </div>
                                 </div>
                             </div>
-                        </div>
+                            <RepositorySettings
+                                repository={repository}
+                                onUpdated={handleRepositoryUpdated}
+                            />
+                        </>
                     )}
                 </div>
             </div>
