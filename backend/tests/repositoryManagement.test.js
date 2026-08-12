@@ -114,7 +114,9 @@ after(async () => {
         Issue.deleteMany({}),
         Comment.deleteMany({})
     ]);
-    server.close();
+
+    server.closeAllConnections();
+    await new Promise((resolve) => server.close(resolve));
     await mongoose.disconnect();
 });
 
@@ -473,5 +475,540 @@ describe("deleteRepository", () => {
 
         assert.equal(response.status, 200);
         assert.equal(await Repository.findById(repo._id), null);
+    });
+});
+
+describe("createRepository", () => {
+    it("returns 401 without a token", async () => {
+        const response = await jsonRequest(
+            "/api/repositories",
+            "POST",
+            { name: "myrepo" }
+        );
+
+        assert.equal(response.status, 401);
+    });
+
+    it("creates a repository owned by the authenticated user", async () => {
+        const response = await jsonRequest(
+            "/api/repositories",
+            "POST",
+            {
+                name: "myrepo",
+                description: "My first repo",
+                visibility: "public"
+            },
+            ownerToken
+        );
+
+        assert.equal(response.status, 201);
+
+        const data = await response.json();
+        assert.equal(data.name, "myrepo");
+        assert.equal(data.description, "My first repo");
+        assert.equal(data.visibility, "public");
+        assert.equal(data.owner.toString(), owner._id.toString());
+        assert.deepEqual(data.branches, ["main"]);
+    });
+
+    it("ignores the owner field from the request body", async () => {
+        const response = await jsonRequest(
+            "/api/repositories",
+            "POST",
+            { name: "no-spoof", owner: other._id },
+            ownerToken
+        );
+
+        assert.equal(response.status, 201);
+
+        const data = await response.json();
+        assert.equal(data.owner.toString(), owner._id.toString());
+
+        const persisted = await Repository.findById(data._id);
+        assert.equal(persisted.owner.toString(), owner._id.toString());
+    });
+
+    it("returns 400 for a duplicate name by the same owner", async () => {
+        await jsonRequest(
+            "/api/repositories",
+            "POST",
+            { name: "myrepo" },
+            ownerToken
+        );
+
+        const response = await jsonRequest(
+            "/api/repositories",
+            "POST",
+            { name: "myrepo" },
+            ownerToken
+        );
+
+        assert.equal(response.status, 400);
+    });
+
+    it("allows the same name for a different owner", async () => {
+        await jsonRequest(
+            "/api/repositories",
+            "POST",
+            { name: "shared" },
+            ownerToken
+        );
+
+        const response = await jsonRequest(
+            "/api/repositories",
+            "POST",
+            { name: "shared" },
+            otherToken
+        );
+
+        assert.equal(response.status, 201);
+    });
+
+    it("returns 400 for an empty repository name", async () => {
+        const response = await jsonRequest(
+            "/api/repositories",
+            "POST",
+            { name: "   " },
+            ownerToken
+        );
+
+        assert.equal(response.status, 400);
+    });
+
+    it("returns 400 for a non-string repository name", async () => {
+        const response = await jsonRequest(
+            "/api/repositories",
+            "POST",
+            { name: 42 },
+            ownerToken
+        );
+
+        assert.equal(response.status, 400);
+    });
+
+    it("returns 400 for an invalid visibility", async () => {
+        const response = await jsonRequest(
+            "/api/repositories",
+            "POST",
+            { name: "myrepo", visibility: "spy" },
+            ownerToken
+        );
+
+        assert.equal(response.status, 400);
+    });
+
+    it("trims whitespace around the repository name", async () => {
+        const response = await jsonRequest(
+            "/api/repositories",
+            "POST",
+            { name: "  padded-name  " },
+            ownerToken
+        );
+
+        assert.equal(response.status, 201);
+
+        const data = await response.json();
+        assert.equal(data.name, "padded-name");
+    });
+
+    it("adds the repository to the owner's repositories array", async () => {
+        const response = await jsonRequest(
+            "/api/repositories",
+            "POST",
+            { name: "linked-repo" },
+            ownerToken
+        );
+
+        assert.equal(response.status, 201);
+
+        const data = await response.json();
+
+        const refreshedOwner = await User.findById(owner._id);
+        const hasRepo = refreshedOwner.repositories.some(
+            (repoId) => repoId.toString() === data._id
+        );
+        assert.equal(hasRepo, true);
+    });
+});
+
+describe("getRepositories", () => {
+    it("returns 401 without a token", async () => {
+        const response = await request("/api/repositories");
+
+        assert.equal(response.status, 401);
+    });
+
+    it("returns only the authenticated user's repositories", async () => {
+        await createRepo("owner-repo");
+        await Repository.create({
+            name: "other-repo",
+            owner: other._id,
+            branches: ["main"]
+        });
+
+        const response = await jsonRequest(
+            "/api/repositories",
+            "GET",
+            null,
+            ownerToken
+        );
+
+        assert.equal(response.status, 200);
+
+        const data = await response.json();
+        assert.equal(data.length, 1);
+        assert.equal(data[0].name, "owner-repo");
+    });
+});
+
+describe("getRepositoryById", () => {
+    it("returns 401 without a token", async () => {
+        const repo = await createRepo("myrepo");
+
+        const response = await request(
+            `/api/repositories/${repo._id}`
+        );
+
+        assert.equal(response.status, 401);
+    });
+
+    it("returns 400 for an invalid repository ID", async () => {
+        const response = await jsonRequest(
+            "/api/repositories/not-an-id",
+            "GET",
+            null,
+            ownerToken
+        );
+
+        assert.equal(response.status, 400);
+    });
+
+    it("returns 404 when the repository does not exist", async () => {
+        const response = await jsonRequest(
+            `/api/repositories/${new mongoose.Types.ObjectId()}`,
+            "GET",
+            null,
+            ownerToken
+        );
+
+        assert.equal(response.status, 404);
+    });
+
+    it("returns a public repository to any authenticated user", async () => {
+        const repo = await createRepo("public-repo", "public");
+
+        const response = await jsonRequest(
+            `/api/repositories/${repo._id}`,
+            "GET",
+            null,
+            otherToken
+        );
+
+        assert.equal(response.status, 200);
+
+        const data = await response.json();
+        assert.equal(data.name, "public-repo");
+        assert.equal(data.isOwner, false);
+    });
+
+    it("returns 403 for a private repository requested by a non-owner", async () => {
+        const repo = await createRepo("private-repo", "private");
+
+        const response = await jsonRequest(
+            `/api/repositories/${repo._id}`,
+            "GET",
+            null,
+            otherToken
+        );
+
+        assert.equal(response.status, 403);
+    });
+
+    it("returns a private repository to its owner", async () => {
+        const repo = await createRepo("owner-private", "private");
+
+        const response = await jsonRequest(
+            `/api/repositories/${repo._id}`,
+            "GET",
+            null,
+            ownerToken
+        );
+
+        assert.equal(response.status, 200);
+
+        const data = await response.json();
+        assert.equal(data.isOwner, true);
+        assert.equal(data.owner._id.toString(), owner._id.toString());
+    });
+
+    it("returns isStarred based on the authenticated user's starRepo", async () => {
+        const repo = await createRepo("starred-repo", "public");
+
+        await User.collection.updateOne(
+            { _id: other._id },
+            { $addToSet: { starRepo: repo._id } }
+        );
+
+        const starredResponse = await jsonRequest(
+            `/api/repositories/${repo._id}`,
+            "GET",
+            null,
+            otherToken
+        );
+
+        const starredData = await starredResponse.json();
+        assert.equal(starredData.isStarred, true);
+
+        const unstarredResponse = await jsonRequest(
+            `/api/repositories/${repo._id}`,
+            "GET",
+            null,
+            ownerToken
+        );
+
+        const unstarredData = await unstarredResponse.json();
+        assert.equal(unstarredData.isStarred, false);
+    });
+});
+
+describe("starRepository", () => {
+    it("returns 401 without a token", async () => {
+        const repo = await createRepo("myrepo");
+
+        const response = await request(
+            `/api/repositories/${repo._id}/star`,
+            { method: "PATCH" }
+        );
+
+        assert.equal(response.status, 401);
+    });
+
+    it("returns 400 for an invalid repository ID", async () => {
+        const response = await jsonRequest(
+            "/api/repositories/not-an-id/star",
+            "PATCH",
+            null,
+            ownerToken
+        );
+
+        assert.equal(response.status, 400);
+    });
+
+    it("returns 404 when the repository does not exist", async () => {
+        const response = await jsonRequest(
+            `/api/repositories/${new mongoose.Types.ObjectId()}/star`,
+            "PATCH",
+            null,
+            ownerToken
+        );
+
+        assert.equal(response.status, 404);
+    });
+
+    it("returns 403 when starring a private repository as a non-owner", async () => {
+        const repo = await createRepo("private-repo", "private");
+
+        const response = await jsonRequest(
+            `/api/repositories/${repo._id}/star`,
+            "PATCH",
+            null,
+            otherToken
+        );
+
+        assert.equal(response.status, 403);
+    });
+
+    it("stars a public repository and increments the count once", async () => {
+        const repo = await createRepo("public-repo", "public");
+
+        const response = await jsonRequest(
+            `/api/repositories/${repo._id}/star`,
+            "PATCH",
+            null,
+            otherToken
+        );
+
+        assert.equal(response.status, 200);
+
+        const data = await response.json();
+        assert.equal(data.isStarred, true);
+        assert.equal(data.stars, 1);
+
+        const refreshed = await Repository.findById(repo._id);
+        assert.equal(refreshed.stars, 1);
+    });
+
+    it("allows the owner to star their own private repository", async () => {
+        const repo = await createRepo("own-repo", "private");
+
+        const response = await jsonRequest(
+            `/api/repositories/${repo._id}/star`,
+            "PATCH",
+            null,
+            ownerToken
+        );
+
+        assert.equal(response.status, 200);
+
+        const data = await response.json();
+        assert.equal(data.isStarred, true);
+        assert.equal(data.stars, 1);
+    });
+
+    it("does not double-count when starring twice", async () => {
+        const repo = await createRepo("twice-repo", "public");
+
+        await jsonRequest(
+            `/api/repositories/${repo._id}/star`,
+            "PATCH",
+            null,
+            ownerToken
+        );
+
+        const response = await jsonRequest(
+            `/api/repositories/${repo._id}/star`,
+            "PATCH",
+            null,
+            ownerToken
+        );
+
+        assert.equal(response.status, 200);
+
+        const data = await response.json();
+        assert.equal(data.stars, 1);
+
+        const refreshed = await Repository.findById(repo._id);
+        assert.equal(refreshed.stars, 1);
+
+        const refreshedUser = await User.findById(owner._id);
+        assert.equal(refreshedUser.starRepo.length, 1);
+    });
+});
+
+describe("unstarRepository", () => {
+    it("returns 401 without a token", async () => {
+        const repo = await createRepo("myrepo");
+
+        const response = await request(
+            `/api/repositories/${repo._id}/unstar`,
+            { method: "PATCH" }
+        );
+
+        assert.equal(response.status, 401);
+    });
+
+    it("returns 400 for an invalid repository ID", async () => {
+        const response = await jsonRequest(
+            "/api/repositories/not-an-id/unstar",
+            "PATCH",
+            null,
+            ownerToken
+        );
+
+        assert.equal(response.status, 400);
+    });
+
+    it("returns 404 when the repository does not exist", async () => {
+        const response = await jsonRequest(
+            `/api/repositories/${new mongoose.Types.ObjectId()}/unstar`,
+            "PATCH",
+            null,
+            ownerToken
+        );
+
+        assert.equal(response.status, 404);
+    });
+
+    it("unstars a starred repository and decrements the count once", async () => {
+        const repo = await createRepo("star-then-unstar", "public");
+
+        await jsonRequest(
+            `/api/repositories/${repo._id}/star`,
+            "PATCH",
+            null,
+            ownerToken
+        );
+
+        const response = await jsonRequest(
+            `/api/repositories/${repo._id}/unstar`,
+            "PATCH",
+            null,
+            ownerToken
+        );
+
+        assert.equal(response.status, 200);
+
+        const data = await response.json();
+        assert.equal(data.isStarred, false);
+        assert.equal(data.stars, 0);
+
+        const refreshed = await Repository.findById(repo._id);
+        assert.equal(refreshed.stars, 0);
+
+        const refreshedUser = await User.findById(owner._id);
+        assert.equal(refreshedUser.starRepo.length, 0);
+    });
+
+    it("does not corrupt the count when unstarring a repository that was never starred", async () => {
+        const repo = await createRepo("never-starred", "public");
+
+        const response = await jsonRequest(
+            `/api/repositories/${repo._id}/unstar`,
+            "PATCH",
+            null,
+            otherToken
+        );
+
+        assert.equal(response.status, 200);
+
+        const data = await response.json();
+        assert.equal(data.stars, 0);
+
+        const refreshed = await Repository.findById(repo._id);
+        assert.equal(refreshed.stars, 0);
+    });
+
+    it("does not decrement below zero on repeated unstar", async () => {
+        const repo = await createRepo("floor-repo", "public");
+
+        await jsonRequest(
+            `/api/repositories/${repo._id}/unstar`,
+            "PATCH",
+            null,
+            ownerToken
+        );
+
+        const response = await jsonRequest(
+            `/api/repositories/${repo._id}/unstar`,
+            "PATCH",
+            null,
+            ownerToken
+        );
+
+        assert.equal(response.status, 200);
+
+        const refreshed = await Repository.findById(repo._id);
+        assert.equal(refreshed.stars, 0);
+    });
+
+    it("keeps the count consistent across concurrent star requests from the same user", async () => {
+        const repo = await createRepo("concurrent-repo", "public");
+
+        await Promise.all(
+            Array.from({ length: 5 }, () =>
+                jsonRequest(
+                    `/api/repositories/${repo._id}/star`,
+                    "PATCH",
+                    null,
+                    otherToken
+                )
+            )
+        );
+
+        const refreshed = await Repository.findById(repo._id);
+        assert.equal(refreshed.stars, 1);
+
+        const refreshedUser = await User.findById(other._id);
+        assert.equal(refreshedUser.starRepo.length, 1);
     });
 });
