@@ -54,7 +54,7 @@ export const starRepository = async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({
-            message: error.message
+            message: "Server error"
         });
     }
 };
@@ -98,7 +98,7 @@ export const unstarRepository = async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({
-            message: error.message
+            message: "Server error"
         });
     }
 }
@@ -107,14 +107,28 @@ export const createRepository = async (req, res) => {
     try {
         const { name, description, visibility } = req.body;
 
-        if (!name) {
+        if (!name || typeof name !== "string" || name.trim() === "") {
             return res.status(400).json({
-                message: "Repository name is required"
+                message: "Repository name must be a non-empty string"
             });
         }
 
+        if (description !== undefined && typeof description !== "string") {
+            return res.status(400).json({
+                message: "Description must be a string"
+            });
+        }
+
+        if (visibility !== undefined && visibility !== "public" && visibility !== "private") {
+            return res.status(400).json({
+                message: "Visibility must be public or private"
+            });
+        }
+
+        const trimmedName = name.trim();
+
         const existingRepo = await Repository.findOne({
-            name,
+            name: trimmedName,
             owner: req.user._id
         });
 
@@ -125,17 +139,22 @@ export const createRepository = async (req, res) => {
         }
 
         const repository = await Repository.create({
-            name,
+            name: trimmedName,
             description,
             visibility,
             owner: req.user._id,
             branches: ["main"]
         });
 
+        await User.updateOne(
+            { _id: req.user._id },
+            { $addToSet: { repositories: repository._id } }
+        );
+
         res.status(201).json(repository);
     } catch (error) {
         res.status(500).json({
-            message: error.message
+            message: "Server error"
         });
     }
 };
@@ -158,22 +177,17 @@ export const createRepository = async (req, res) => {
 // };
 export const getRepositories = async (req, res) => {
     try {
-        console.log("===== getRepositories CALLED =====");
-        console.log("req.user =", req.user);
-
         const repositories = await Repository.find({
             owner: req.user._id
+        }).sort({
+            createdAt: -1
         });
-
-        console.log("repositories =", repositories);
 
         return res.status(200).json(repositories);
 
     } catch (error) {
-        console.error("getRepositories ERROR:", error);
-
         return res.status(500).json({
-            message: error.message
+            message: "Server error"
         });
     }
 };
@@ -275,7 +289,7 @@ export const updateRepository = async (req, res) => {
                 });
             }
 
-            updates.name = name;
+            updates.name = name.trim();
         }
 
         if (description !== undefined) {
