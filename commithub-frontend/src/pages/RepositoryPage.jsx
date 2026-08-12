@@ -15,6 +15,7 @@ const RepositoryPage = () => {
     const [activeTab, setActiveTab] = useState("code");
     const [starred, setStarred] = useState(false);
     const [starCount, setStarCount] = useState(0);
+    const [actionError, setActionError] = useState("");
 
     useEffect(() => {
         const loadRepository = async () => {
@@ -36,6 +37,7 @@ const RepositoryPage = () => {
 
     const handleStarToggle = async () => {
         try {
+            setActionError("");
             if (starred) {
                 const data = await unstarRepository(repository._id);
                 setStarred(false);
@@ -46,7 +48,9 @@ const RepositoryPage = () => {
                 setStarCount(data.stars);
             }
         } catch (error) {
-            console.log(error);
+            setActionError(
+                error.response?.data?.message || "Could not update star"
+            );
         }
     };
 
@@ -95,6 +99,9 @@ const RepositoryPage = () => {
                         </span>
                     </div>
                 </div>
+                {actionError && (
+                    <p className="repo-action-error">{actionError}</p>
+                )}
                 <div className="repository-stats">
                     <div className="stat-card">
                         <span>Stars</span>
