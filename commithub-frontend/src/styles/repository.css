@@ -59,6 +59,11 @@
     color:white;
 }
 
+.repo-action-error{
+    color:#f85149;
+    margin-bottom:16px;
+}
+
 .repository-stats{
     display:grid;
     grid-template-columns:repeat(3,1fr);
