@@ -67,7 +67,7 @@ const RepositorySettings = ({ repository, onUpdated }) => {
 
         try {
             await deleteRepository(repository._id);
-            navigate("/repositories");
+            navigate("/dashboard");
         } catch (error) {
             setMessage({
                 type: "error",
