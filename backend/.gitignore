@@ -1,5 +1,6 @@
 # CommitHub internal folder
 .CommitHub/
+repo-storage/
 node_modules/
 logs
 *.log
