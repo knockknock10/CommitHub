@@ -5,6 +5,8 @@ import {
     deleteRepository,
     getRepositories,
     getRepositoryById,
+    getRepositoryFile,
+    getRepositoryTree,
     starRepository,
     unstarRepository,
     updateRepository
@@ -20,6 +22,12 @@ router.route("/:id")
 .get(protect, getRepositoryById)
 .patch(protect, updateRepository)
 .delete(protect, deleteRepository);
+
+router.route("/:id/tree")
+.get(protect, getRepositoryTree);
+
+router.route("/:id/file")
+.get(protect, getRepositoryFile);
 
 router.route("/:id/star")
 .patch(protect, starRepository);
