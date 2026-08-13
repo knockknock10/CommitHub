@@ -4,6 +4,7 @@ import { fetchRepositoryById, starRepository, unstarRepository } from "../api/re
 import { useEffect, useState } from "react";
 import IssueList from "../components/issue/IssueList";
 import RepositorySettings from "../components/repo/RepositorySettings";
+import RepositoryCode from "../components/repo/RepositoryCode";
 import "../styles/repository.css";
 
 const RepositoryPage = () => {
@@ -15,6 +16,7 @@ const RepositoryPage = () => {
     const [activeTab, setActiveTab] = useState("code");
     const [starred, setStarred] = useState(false);
     const [starCount, setStarCount] = useState(0);
+    const [actionError, setActionError] = useState("");
 
     useEffect(() => {
         const loadRepository = async () => {
@@ -36,6 +38,7 @@ const RepositoryPage = () => {
 
     const handleStarToggle = async () => {
         try {
+            setActionError("");
             if (starred) {
                 const data = await unstarRepository(repository._id);
                 setStarred(false);
@@ -46,7 +49,9 @@ const RepositoryPage = () => {
                 setStarCount(data.stars);
             }
         } catch (error) {
-            console.log(error);
+            setActionError(
+                error.response?.data?.message || "Could not update star"
+            );
         }
     };
 
@@ -95,6 +100,9 @@ const RepositoryPage = () => {
                         </span>
                     </div>
                 </div>
+                {actionError && (
+                    <p className="repo-action-error">{actionError}</p>
+                )}
                 <div className="repository-stats">
                     <div className="stat-card">
                         <span>Stars</span>
@@ -119,12 +127,9 @@ const RepositoryPage = () => {
                 </div>
                 <div className="repository-content">
                     {activeTab === "code" && (
-                        <div className="repository-section">
-                            <h2>Code</h2>
-                            <p>
-                                Repository code view coming soon.
-                            </p>
-                        </div>
+                        <RepositoryCode
+                            repository={repository}
+                        />
                     )}
                     {activeTab === "issues" && (
                         <IssueList
