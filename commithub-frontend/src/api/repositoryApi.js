@@ -46,3 +46,17 @@ export const deleteRepository = async(id)=>{
     );
     return response.data;
 }
+export const fetchRepositoryTree = async(id, path = "")=>{
+    const response = await api.get(
+        `/repositories/${id}/tree`,
+        { params: { path } }
+    );
+    return response.data;
+}
+export const fetchRepositoryFile = async(id, filePath)=>{
+    const response = await api.get(
+        `/repositories/${id}/file`,
+        { params: { path: filePath } }
+    );
+    return response.data;
+}
