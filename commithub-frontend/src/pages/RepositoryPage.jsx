@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import IssueList from "../components/issue/IssueList";
 import RepositorySettings from "../components/repo/RepositorySettings";
 import RepositoryCode from "../components/repo/RepositoryCode";
+import RepositoryCommits from "../components/repo/RepositoryCommits";
 import "../styles/repository.css";
 
 const RepositoryPage = () => {
@@ -121,6 +122,7 @@ const RepositoryPage = () => {
                     <button onClick={() =>setActiveTab("code")}>Code</button>
                     <button onClick={() =>setActiveTab("issues")}>Issues</button>
                     <button onClick={() =>setActiveTab("branches")}>Branches</button>
+                    <button onClick={() =>setActiveTab("commits")}>Commits</button>
                     {repository.isOwner && (
                         <button onClick={() =>setActiveTab("settings")}>Settings</button>
                     )}
@@ -152,6 +154,12 @@ const RepositoryPage = () => {
                                 ))}
                             </div>
                         </div>
+                    )}
+                    {activeTab === "commits" && (
+                        <RepositoryCommits
+                            repository={repository}
+                            isOwner={repository.isOwner}
+                        />
                     )}
                     {activeTab === "settings" && (
                         <>
