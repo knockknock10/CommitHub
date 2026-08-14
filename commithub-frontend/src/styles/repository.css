@@ -484,3 +484,257 @@
     line-height:1.6;
     font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
 }
+
+/* repository commits */
+
+.commits-view{
+    display:flex;
+    flex-direction:column;
+    gap:24px;
+}
+
+.commit-create{
+    background:#161b22;
+    border:1px solid #30363d;
+    border-radius:12px;
+    padding:24px;
+}
+
+.commit-create-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    flex-wrap:wrap;
+    margin-bottom:16px;
+}
+
+.commit-create-header h3{
+    margin:0;
+}
+
+.commit-change-summary{
+    color:#8b949e;
+    font-size:.9rem;
+    margin:0;
+}
+
+.commit-change-list{
+    display:flex;
+    flex-direction:column;
+    max-height:220px;
+    overflow-y:auto;
+    border:1px solid #21262d;
+    border-radius:8px;
+    margin-bottom:16px;
+}
+
+.commit-change-more{
+    color:#8b949e;
+    font-size:.85rem;
+    padding:8px 16px;
+    margin:0;
+}
+
+.commit-create-form{
+    display:flex;
+    gap:12px;
+}
+
+.commit-message-input{
+    flex:1;
+    background:#0d1117;
+    border:1px solid #30363d;
+    border-radius:8px;
+    color:#c9d1d9;
+    padding:10px 12px;
+    font-size:.95rem;
+    outline:none;
+}
+
+.commit-message-input:focus{
+    border-color:#58a6ff;
+}
+
+.commit-submit-btn{
+    background:#238636;
+    color:white;
+    border:none;
+    border-radius:8px;
+    padding:10px 18px;
+    font-size:.95rem;
+    font-weight:600;
+    cursor:pointer;
+}
+
+.commit-submit-btn:hover{
+    background:#2ea043;
+}
+
+.commit-submit-btn:disabled{
+    opacity:.6;
+    cursor:not-allowed;
+}
+
+.commit-message{
+    margin-top:12px;
+    font-size:.9rem;
+}
+
+.commit-message.success{
+    color:#3fb950;
+}
+
+.commit-message.error{
+    color:#f85149;
+}
+
+.commit-history{
+    background:#161b22;
+    border:1px solid #30363d;
+    border-radius:12px;
+    padding:24px;
+}
+
+.commit-history h3{
+    margin:0 0 16px;
+}
+
+.commit-empty{
+    color:#8b949e;
+    text-align:center;
+    margin:0;
+}
+
+.commit-list{
+    display:flex;
+    flex-direction:column;
+}
+
+.commit-row{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    gap:12px;
+    flex-wrap:wrap;
+    background:none;
+    border:none;
+    border-bottom:1px solid #21262d;
+    color:#c9d1d9;
+    padding:14px 0;
+    text-align:left;
+    cursor:pointer;
+    width:100%;
+}
+
+.commit-row:last-child{
+    border-bottom:none;
+}
+
+.commit-row:hover .commit-row-message{
+    color:#58a6ff;
+}
+
+.commit-row-main{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    min-width:0;
+}
+
+.commit-row-id{
+    color:#58a6ff;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:.85rem;
+}
+
+.commit-row-message{
+    font-weight:600;
+    color:#f0f6fc;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+}
+
+.commit-row-meta{
+    display:flex;
+    gap:16px;
+    color:#8b949e;
+    font-size:.85rem;
+}
+
+.commit-detail{
+    display:flex;
+    flex-direction:column;
+    gap:16px;
+}
+
+.commit-detail-header{
+    background:#161b22;
+    border:1px solid #30363d;
+    border-radius:12px;
+    padding:24px;
+}
+
+.commit-detail-header h3{
+    margin:0 0 8px;
+}
+
+.commit-detail-header p{
+    color:#8b949e;
+    margin:4px 0;
+}
+
+.commit-detail-header .commit-id{
+    color:#58a6ff;
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:.85rem;
+}
+
+.commit-files{
+    background:#161b22;
+    border:1px solid #30363d;
+    border-radius:12px;
+    overflow:hidden;
+}
+
+.commit-file-row{
+    display:flex;
+    align-items:center;
+    gap:12px;
+    border-bottom:1px solid #21262d;
+    color:#c9d1d9;
+    padding:10px 16px;
+}
+
+.commit-file-row:last-child{
+    border-bottom:none;
+}
+
+.commit-status{
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:.85rem;
+    font-weight:600;
+    width:20px;
+}
+
+.commit-status-a{
+    color:#3fb950;
+}
+
+.commit-status-m{
+    color:#d29922;
+}
+
+.commit-status-d{
+    color:#f85149;
+}
+
+.commit-file-path{
+    font-size:.9rem;
+}
+
+.commit-error{
+    color:#f85149;
+    margin:0;
+}
