@@ -60,3 +60,29 @@ export const fetchRepositoryFile = async(id, filePath)=>{
     );
     return response.data;
 }
+export const fetchRepositoryChanges = async(id)=>{
+    const response = await api.get(
+        `/repositories/${id}/changes`
+    );
+    return response.data;
+}
+export const fetchRepositoryCommits = async(id, limit, offset)=>{
+    const response = await api.get(
+        `/repositories/${id}/commits`,
+        { params: { limit, offset } }
+    );
+    return response.data;
+}
+export const fetchRepositoryCommit = async(id, commitId)=>{
+    const response = await api.get(
+        `/repositories/${id}/commits/${commitId}`
+    );
+    return response.data;
+}
+export const createRepositoryCommit = async(id, message)=>{
+    const response = await api.post(
+        `/repositories/${id}/commits`,
+        { message }
+    );
+    return response.data;
+}
