@@ -1285,3 +1285,255 @@ The snapshot layout mirrors the working tree, so the exact same `resolveRepoPath
 ## Interview Closing Statement
 
 Commit snapshots integrate by pointing the existing tree/file endpoints at a commit's snapshot directory instead of the working tree, reusing the same path-validation layer and adding per-entry commit metadata to the response.
+
+---
+
+# Feature 06 – Commit System and Commit History
+
+# Q11. What is a commit in your system?
+
+## High-Level Explanation
+
+A commit is an immutable record of the repository at one point in time. It is a directory at `.CommitHub/commits/<id>/` containing two things: a `snapshot/` folder — a byte-for-byte copy of the working tree at commit time, with relative paths preserved — and a `meta.json` file with `id`, `message`, `author`, `timestamp`, `parent`, and the `files` it changed (`A`/`M`/`D`).
+
+## Where it is implemented
+
+`createCommit` in `backend/utils/repoVersion.js` writes the snapshot and metadata and then advances the branch reference; `POST /api/repositories/:id/commits` in `backend/controllers/commitController.js` exposes it.
+
+## Interview Closing Statement
+
+A commit is the snapshot plus its metadata stored as an immutable directory under `.CommitHub/commits/<id>/` — the filesystem equivalent of Git's commit object, kept deliberately simple.
+
+---
+
+# Q12. How is a commit different from the working tree?
+
+## High-Level Explanation
+
+The working tree (`repo-storage/<ownerId>/<repoId>/`) is the mutable directory the user edits and that Feature 05's browser reads. A commit is a frozen copy of that tree at a specific moment, stored separately under `.CommitHub/commits/<id>/snapshot/`. Editing the working tree changes the files the next commit will see; it never changes commits that already exist.
+
+## Interview Closing Statement
+
+The working tree is the present and mutable state; a commit is a point-in-time, immutable copy of it — two physically separate directories that the change detector diffs against each other.
+
+---
+
+# Q13. How do you guarantee commit immutability?
+
+## High-Level Explanation
+
+Structurally. A commit is written once: the service creates `commits/<id>/snapshot/`, copies the working-tree files in, writes `meta.json`, and only then advances the branch ref. No endpoint ever rewrites an existing commit directory, and the commit directory lives inside `.CommitHub`, which is excluded from both change detection and the Feature 05 tree listing, so a commit can never become the input of a later commit. Immutability is enforced by layout and copy-on-commit, not by locking.
+
+## Interview Closing Statement
+
+Immutability falls out of the design — each commit is a separate, never-rewritten directory of file copies, and bookkeeping is excluded from future snapshots — verified by a test that edits the working tree and asserts the old snapshot is unchanged.
+
+---
+
+# Q14. How is a parent commit represented?
+
+## High-Level Explanation
+
+As a single `parent` field in `meta.json`. When a commit is created, the service reads the current head commit from `refs/heads/<branch>` and stores it as the new commit's `parent` (`null` for the first commit). This yields a linear history: C → B → A. Multi-parent (merge) commits are intentionally out of scope.
+
+## Interview Closing Statement
+
+Each commit carries its parent's ID in `meta.json`; the branch ref points at the newest commit, so a commit knows where it came from and the chain is walked backwards.
+
+---
+
+# Q15. How is commit history traversed?
+
+## High-Level Explanation
+
+`getCommitHistory` in `backend/utils/repoVersion.js` reads the current branch from `HEAD`, reads the head commit ID from `refs/heads/<branch>`, then loops: read `meta.json`, collect `{id, message, author, timestamp, parent}`, jump to `parent`, repeat. The natural chain order is newest first, which is what the UI shows. `limit` (default 50, max 100) and `offset` are applied while walking, and a missing or corrupt ancestor stops the walk at the readable prefix.
+
+## Interview Closing Statement
+
+History is the parent chain walked backwards from the branch reference, newest first, stopping cleanly on a missing or corrupt ancestor.
+
+---
+
+# Q16. Where are commit objects stored?
+
+## High-Level Explanation
+
+On the backend filesystem inside each repository's bookkeeping directory: `<repoRoot>/.CommitHub/commits/<id>/`, where `<repoRoot>` is `repo-storage/<ownerId>/<repoId>/`. `refs/heads/<branch>` and `HEAD` sit alongside it under `.CommitHub/`. MongoDB stores only the `Repository` metadata document and never sees commit bytes.
+
+## Interview Closing Statement
+
+Commit objects live in `.CommitHub/commits/<id>/` next to the tree they snapshot, sharing the storage architecture that Feature 05 established and the CLI already uses.
+
+---
+
+# Q17. Why didn't you store entire repository snapshots in MongoDB?
+
+## High-Level Explanation
+
+Three reasons. Capacity: MongoDB documents cap at 16 MB, and a snapshot is unbounded bytes. Separation of concerns: Feature 05 already decided MongoDB holds metadata while file bytes live on disk, and a commit snapshot is file bytes. Integrity and sharing: storing commits in `.CommitHub` keeps them beside the tree they represent, keeps the CLI and web on one source of truth, and makes immutability a filesystem property rather than a discipline the database must re-implement. The small metadata record (`meta.json`) is a plain JSON file next to its snapshot; it does not need an index, so a MongoDB `Commit` collection would duplicate a source of truth that already exists.
+
+## Interview Closing Statement
+
+Snapshots are unbounded bytes that belong on disk, and the existing architecture already puts repository bytes in `.CommitHub`; MongoDB would add a 16 MB ceiling and a second source of truth for no benefit at this scale.
+
+---
+
+# Q18. What happens if a commit is created but HEAD update fails?
+
+## High-Level Explanation
+
+`HEAD` never changes on commit — it still says which branch is checked out. What moves is `refs/heads/<branch>`. The ordering is: write snapshot → write `meta.json` → write the branch ref. If the snapshot or metadata writes fail, the partial commit directory is deleted and the ref never moves, so the repository stays at its previous commit. If the ref write itself fails, the now-unreferenced commit directory is removed best-effort and a 500 is returned; the branch still points at the old commit, the working tree still holds the edits, and the user can simply commit again. The invariant is that the ref only ever points at a fully-written commit.
+
+## Interview Closing Statement
+
+The ref moves last and only ever points at a fully-written commit; on any failure the partial or unreferenced commit directory is removed, leaving the repository at its previous consistent state.
+
+---
+
+# Q19. How do you detect modified files?
+
+## High-Level Explanation
+
+`getWorkingTreeChanges` in `repoVersion.js` walks the working tree (skipping `.CommitHub`) and the head snapshot, then for files present in both computes a SHA-1 of each and compares them. A hash mismatch means `M`. This is the same hash-based comparison the CLI's `status` uses; a file present in the working tree but missing from the snapshot is `A`, and one present in the snapshot but missing from the tree is `D`.
+
+## Interview Closing Statement
+
+A file is modified when its SHA-1 in the working tree differs from the one in the head commit's snapshot; hashing both sides avoids any comparison of the bytes by value.
+
+---
+
+# Q20. How do you detect deleted files?
+
+## High-Level Explanation
+
+After diffing, the service iterates the head snapshot's file list: any snapshot file that is absent from the working-tree set is recorded as `D`. The changed-file list is sorted by path for determinism, and deleted files are simply not copied into the new snapshot.
+
+## Interview Closing Statement
+
+Deletion is the inverse membership check — a snapshot file that is no longer in the working tree is a `D`, and it is omitted from the new snapshot.
+
+---
+
+# Q21. How do you prevent unauthorized users from committing?
+
+## High-Level Explanation
+
+Two layers. Authentication is the existing JWT `protect` middleware: no valid token, no controller runs. Authorization is the `authorizeRepository` helper in `commitController.js`: commit creation is a write operation, so it is owner-only for public and private repositories alike (`repository.owner.toString() === req.user._id.toString()`, else 403). This mirrors the platform's existing write rule (`updateRepository`, `deleteRepository`). Read endpoints use the visibility rules: public → any authenticated user, private → owner.
+
+## Interview Closing Statement
+
+The JWT middleware gates the route, and commit creation is an owner-only write — the same authorization rule the platform already applies to repository updates and deletes.
+
+---
+
+# Q22. How would you scale commit storage?
+
+## High-Level Explanation
+
+Today each commit copies the whole tree, so storage grows linearly with commits × tree size and duplicate blobs are stored repeatedly. The scaling path is to stop storing full copies and store content once, keyed by blob hash (see Q23), plus a compact tree/manifest per commit. Object storage (S3) replaces the local disk, each blob is a key under a repository prefix, and commit manifests reference blob keys; a commit is then a small JSON manifest instead of a directory of files. History queries that today walk small JSON files stay cheap if manifests are small and can be cached.
+
+## Interview Closing Statement
+
+Scale comes from deduplicating content (blobs stored once, referenced by hash) and moving the byte store to object storage, leaving the commit as a small manifest rather than a full tree copy.
+
+---
+
+# Q23. How would you implement content-addressable storage?
+
+## High-Level Explanation
+
+Replace "copy every file into the snapshot" with "store every file once, addressed by its SHA-1". A `blobs/` store holds each unique file content keyed by `sha1(content)`; a commit's snapshot becomes a manifest mapping relative paths to blob IDs plus the file's previous ID so a tree can be reconstructed by walking the manifest. Writing a commit: hash each changed file, `put` the blob if absent, record the mapping, and write a small manifest. Two commits that share unchanged files then share blobs, and storage drops to roughly the working tree's size plus a manifest per commit. Read-back must verify the blob's hash matches its key to preserve integrity.
+
+## Interview Closing Statement
+
+Content addressing makes the blob store self-verifying and deduplicating — identical content maps to one blob regardless of how many commits reference it — which is exactly the property Git's object database has.
+
+---
+
+# Q24. How does Git actually store objects?
+
+## High-Level Explanation
+
+Git stores content in `.git/objects/` as four object types: blobs (file content), trees (directory listings mapping names to blob/tree object IDs), commits (tree ID, parent IDs, author/committer, message), and tags. Each object is stored at `.git/objects/xx/yyyy...` where the path is the first two hex characters and the rest of the SHA-1 of the object's content, optionally zlib-compressed. A commit references a tree that references blobs, so content appears exactly once even if shared across commits. Our implementation is a teaching simplification: one snapshot directory per commit plus a `meta.json`, no tree objects and no deduplication.
+
+## Interview Closing Statement
+
+Git's object database is content-addressable — blobs, trees, and commits all stored by SHA-1 with trees providing the path mapping — while CommitHub's full-copy snapshot is the same idea without deduplication or tree indirection.
+
+---
+
+# Q25. What is the difference between Git's working tree, index, and repository?
+
+## High-Level Explanation
+
+In Git, the working tree is your editable files; the index (staging area) is a snapshot of the changes you have selected for the next commit; and the repository is the committed object database (`.git`) that records history. `git add` writes to the index, `git commit` snapshots the index into the repository. CommitHub maps these concepts onto its own layout: the working tree is the repository directory; the staging area is `.CommitHub/staging/` (the CLI's `add` copies files there); and the repository/history is `.CommitHub/commits/` plus `refs/heads/`. The one deliberate difference is that the web API currently commits the whole working tree directly — equivalent to `git commit -a` — because there is no web staging UI yet.
+
+## Interview Closing Statement
+
+Git separates editable working tree, selectable index, and committed repository; CommitHub keeps the same three ideas, with web commits currently skipping the index (commit-everything) until a staging UI is built.
+
+---
+
+# Q26. How would you implement branching on top of this system?
+
+## High-Level Explanation
+
+The layout is already branch-ready: `refs/heads/<branch>` is a file holding a commit ID, and `HEAD` says which branch is checked out. `git branch` becomes "create a new `refs/heads/<name>` file containing the current head commit ID" — the CLI's `branch` controller already does this. `git checkout` becomes "change `HEAD` to `ref: refs/heads/<name>` and copy that branch's head snapshot into the working tree" — the CLI's `checkout` controller sketches it. Creating a commit already writes to `refs/heads/<current-branch>` (derived from `HEAD`), so branching needs no commit changes.
+
+## Interview Closing Statement
+
+Branching is nearly free here because commits already hang off `refs/heads/<branch>` and `HEAD` already selects the branch; a branch is just a new ref file pointing at an existing commit.
+
+---
+
+# Q27. How would checkout work?
+
+## High-Level Explanation
+
+Read the target branch's head commit from `refs/heads/<target>`; if it differs from the current branch, update `HEAD` to point at the target ref, and materialize the target snapshot into the working tree — copy the snapshot's files to `<repoRoot>/`, removing any working-tree files that are in the current snapshot but not in the target's (to avoid stale files), and detect uncommitted changes first so the user does not lose edits. The CLI's `checkout` controller already does the naive copy-and-rewrite-HEAD version; the web version would add the dirty-tree guard and the deletion pass.
+
+## Interview Closing Statement
+
+Checkout swaps `HEAD` to the target ref and reconciles the working tree with the target snapshot, guarding against uncommitted changes before touching the files.
+
+---
+
+# Q28. How would merge work?
+
+## High-Level Explanation
+
+A three-way merge between two branches' head commits: find the merge base (the nearest common ancestor by walking parent chains — the first commit whose ID appears in both branches' histories), then compare base → ours and base → theirs. A file changed on only one side takes that side; changed on both sides with identical content is fine; changed on both sides with different content is a conflict the user resolves (storing base/ours/theirs for a merge tool). The result is a new commit with two parents — which is why the metadata model must allow a `parent` array, the one extension this feature explicitly deferred.
+
+## Interview Closing Statement
+
+Merge is a three-way reconcile against the common ancestor that produces a two-parent commit; the single-parent field in `meta.json` would become a parent list, the only schema change required.
+
+---
+
+# Q29. How would you implement diff between two commits?
+
+## High-Level Explanation
+
+The change detector already computes differences between a working tree and a snapshot. Diffing two commits is the same operation with both inputs being snapshots: walk both snapshots, and for every path produce `A` (in target only), `D` (in source only), or `M` (in both, different content). Line-level hunks are a follow-on: read both file contents and run a line diff (LCS-based) on the pairs flagged `M`, rendering `+`/`-` lines — the single-commit view already lists the per-file statuses, which is the coarse-grained diff.
+
+## Interview Closing Statement
+
+Diffing two commits reuses the existing snapshot-walking change detector, producing A/M/D per path, with line-level hunks added by running a line diff on the modified pairs.
+
+---
+
+# Q30. What consistency guarantees does your filesystem-based implementation provide?
+
+## High-Level Explanation
+
+The branch reference is the commit of truth and it only ever points at a fully-written commit: snapshot and `meta.json` are written before the ref, and any failure removes the partial or unreferenced commit directory, so a reader never sees a half-written commit. Commit directories are immutable once written, so reads are repeatable. History walks stop cleanly on a missing or corrupt ancestor rather than corrupting the whole view. The acknowledged gaps are concurrency (no per-repo lock, so simultaneous commits could orphan one commit directory) and the lack of an atomic "write commit + move ref" operation — the best-effort cleanup plus write-order invariant keeps the repository consistent, but a lock or a small transaction would close the race.
+
+## Interview Closing Statement
+
+The guarantee is: the ref only ever points at a complete, immutable commit, and failures clean up after themselves so the repository stays at its previous consistent state; the known gap is concurrent writers, which a per-repository lock would close.
+
+---
+
+# Feature 06 Interview Closing Statement
+
+The commit system is a filesystem version-control service built on Feature 05's storage: the working tree is the mutable present, a commit is an immutable snapshot plus metadata under `.CommitHub/commits/`, the parent chain is the history, and `refs/heads/<branch>` is the moving pointer — all secured by the existing JWT middleware, owner-only writes, strict commit-ID validation, and a change detector that reuses the repository's own storage layout.
