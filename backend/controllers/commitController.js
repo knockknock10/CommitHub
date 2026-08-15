@@ -4,6 +4,7 @@ import {
     MAX_COMMIT_MESSAGE_LENGTH,
     DEFAULT_HISTORY_LIMIT,
     MAX_HISTORY_LIMIT,
+    ensureVersionControl,
     createCommit as performCommit,
     getCommit as readCommit,
     getCommitHistory as readCommitHistory,
@@ -125,8 +126,10 @@ export const getCommitHistory = async (req, res) => {
             result.repository._id
         );
 
+        const vcRoot = await ensureVersionControl(repoRoot);
+
         const [currentBranch, commits] = await Promise.all([
-            readCurrentBranch(repoRoot),
+            readCurrentBranch(vcRoot),
             readCommitHistory(repoRoot, { limit, offset })
         ]);
 
