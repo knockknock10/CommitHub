@@ -1,5 +1,8 @@
 # CommitHub internal folder
 .CommitHub/
+
+# Local design docs (not tracked)
+docs/
 node_modules/
 logs
 .env
