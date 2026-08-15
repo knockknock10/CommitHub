@@ -272,6 +272,34 @@ describe("branch listing", () => {
         assert.equal(response.status, 200);
     });
 
+    it("lists nested branches with their full names", async () => {
+        const repo = await createRepo("myrepo");
+        await writeRepoFile(repo, "a.txt", "one");
+        await commitHeadCommit(repo, "first");
+
+        await createBranchRequest(
+            repo,
+            { name: "feature/x" },
+            ownerToken
+        );
+        await createBranchRequest(
+            repo,
+            { name: "feature/login" },
+            ownerToken
+        );
+
+        const response = await listBranchesRequest(repo, ownerToken);
+        const body = await response.json();
+
+        const names = body.branches.map((branch) => branch.name);
+
+        assert.equal(body.branches.length, 3);
+        assert.ok(names.includes("main"));
+        assert.ok(names.includes("feature/x"));
+        assert.ok(names.includes("feature/login"));
+        assert.equal(body.branches.find((b) => b.name === "feature/x").commitId, body.branches.find((b) => b.name === "main").commitId);
+    });
+
     it("returns 403 for a private repository's branches requested by a non-owner", async () => {
         const repo = await createRepo("myrepo", "private");
 
@@ -352,7 +380,9 @@ describe("branch creation", () => {
             "..",
             "a..b",
             "/slash",
-            "trail/ing",
+            "trail/",
+            "trail//ing",
+            "feature/.",
             "-leading-dash",
             "",
             "x".repeat(64)
@@ -651,7 +681,7 @@ describe("branch checkout", () => {
 
     it("prunes empty directories left by files not on the target branch", async () => {
         const repo = await createRepo("myrepo");
-        await writeRepoFile(repo, "src/app.js", "app");
+        await writeRepoFile(repo, "root.txt", "base");
         await commitHeadCommit(repo, "base");
 
         await createBranchRequest(
@@ -670,6 +700,10 @@ describe("branch checkout", () => {
                 path.join(repoRoot(repo), "src")
             ).then(() => "exists").catch(() => "gone"),
             "gone"
+        );
+        assert.equal(
+            await readRepoFile(repo, "root.txt"),
+            "base"
         );
     });
 
@@ -729,5 +763,46 @@ describe("branch checkout", () => {
         assert.equal(devBody.commits.length, 2);
         assert.equal(devBody.commits[0].message, "dev two");
         assert.equal(devBody.commits[1].message, "main one");
+    });
+
+    it("tracks the full nested branch name across checkout", async () => {
+        const repo = await createRepo("myrepo");
+        await writeRepoFile(repo, "a.txt", "one");
+        await commitHeadCommit(repo, "first");
+
+        await createBranchRequest(
+            repo,
+            { name: "feature/x" },
+            ownerToken
+        );
+
+        const response = await checkoutRequest(
+            repo,
+            { name: "feature/x" },
+            ownerToken
+        );
+
+        assert.equal(response.status, 200);
+
+        assert.equal(
+            (await fs.promises.readFile(headFilePath(repo), "utf-8")).trim(),
+            "ref: refs/heads/feature/x"
+        );
+
+        const listing = await listBranchesRequest(repo, ownerToken);
+        const body = await listing.json();
+
+        assert.equal(body.currentBranch, "feature/x");
+        assert.equal(
+            body.branches.find((branch) => branch.name === "feature/x").isCurrent,
+            true
+        );
+
+        const refPath = branchRefPath(repo, "feature/x");
+
+        assert.equal(
+            (await fs.promises.readFile(refPath, "utf-8")).trim().length,
+            12
+        );
     });
 });
