@@ -7,6 +7,7 @@ const DEFAULT_HISTORY_LIMIT = 50;
 const MAX_HISTORY_LIMIT = 100;
 const COMMIT_ID_PATTERN = /^[0-9a-f]{4,40}$/i;
 const BRANCH_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,62}$/;
+const TAG_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/;
 
 const isValidCommitId = (commitId) =>
     typeof commitId === "string" && COMMIT_ID_PATTERN.test(commitId);
@@ -18,6 +19,13 @@ const isValidBranchName = (branchName) =>
     branchName
         .split("/")
         .every((part) => part.length > 0 && part !== ".");
+
+const isValidTagName = (tagName) =>
+    typeof tagName === "string" &&
+    TAG_NAME_PATTERN.test(tagName) &&
+    !tagName.includes("..") &&
+    !tagName.endsWith(".") &&
+    !tagName.endsWith(".lock");
 
 const getVcRoot = (repoRoot) =>
     path.join(repoRoot, ".CommitHub");
@@ -38,6 +46,10 @@ const ensureVersionControl = async (repoRoot) => {
     );
     await fs.promises.mkdir(
         path.join(vcRoot, "refs", "heads"),
+        { recursive: true }
+    );
+    await fs.promises.mkdir(
+        path.join(vcRoot, "refs", "tags"),
         { recursive: true }
     );
 
@@ -137,15 +149,25 @@ const hashFile = async (filePath) => {
     return crypto.createHash("sha1").update(content).digest("hex");
 };
 
-const getSnapshotRoot = (vcRoot, commitId) => {
+const getSnapshot = async (vcRoot, commitId) => {
     const commitDir = path.join(vcRoot, "commits", commitId);
     const snapshotDir = path.join(commitDir, "snapshot");
+    const hasSnapshotLayout = fs.existsSync(snapshotDir);
+    const root = hasSnapshotLayout ? snapshotDir : commitDir;
 
-    if (fs.existsSync(snapshotDir)) {
-        return snapshotDir;
-    }
+    /*
+     * Legacy commits stored files directly in the commit directory next to
+     * meta.json, so that metadata file must be skipped there. Commits in the
+     * snapshot layout keep only tracked files in snapshot/, so a working-tree
+     * file literally named "meta.json" is a legitimate committed file and
+     * must never be skipped.
+     */
+    const skip = hasSnapshotLayout ? [] : ["meta.json"];
 
-    return commitDir;
+    return {
+        root,
+        files: await collectFiles(root, "", skip)
+    };
 };
 
 const getWorkingTreeChanges = async (repoRoot) => {
@@ -166,11 +188,9 @@ const getWorkingTreeChanges = async (repoRoot) => {
         }));
     }
 
-    const snapshotRoot = getSnapshotRoot(vcRoot, headCommitId);
-    const snapshotFiles = await collectFiles(
-        snapshotRoot,
-        "",
-        ["meta.json"]
+    const { root: snapshotRoot, files: snapshotFiles } = await getSnapshot(
+        vcRoot,
+        headCommitId
     );
     const snapshotSet = new Set(snapshotFiles);
 
@@ -493,17 +513,64 @@ const createBranch = async (repoRoot, branchName) => {
     const vcRoot = await ensureVersionControl(repoRoot);
     const refPath = getBranchRefPath(vcRoot, branchName);
 
-    try {
-        await fs.promises.access(refPath);
+    const branchExists = async () => {
+        try {
+            const stat = await fs.promises.stat(refPath);
 
-        const error = new Error(`Branch "${branchName}" already exists`);
-        error.code = "BRANCH_EXISTS";
-        throw error;
-    } catch (error) {
-        if (error.code === "BRANCH_EXISTS") {
-            throw error;
+            /*
+             * A directory at the ref path means an existing branch is a
+             * prefix of the requested name, e.g. "feature/x" exists and
+             * "feature" is requested, or the reverse.
+             */
+            return { exists: true, isDirectory: stat.isDirectory() };
+        } catch {
+            return { exists: false, isDirectory: false };
         }
-        /* ENOENT — the branch does not exist yet */
+    };
+
+    const ancestorIsBranch = async () => {
+        const parts = branchName.split("/");
+
+        for (let i = 1; i < parts.length; i += 1) {
+            const ancestorPath = getBranchRefPath(
+                vcRoot,
+                parts.slice(0, i).join("/")
+            );
+
+            try {
+                const stat = await fs.promises.stat(ancestorPath);
+
+                if (stat.isFile()) {
+                    return true;
+                }
+            } catch {
+                /* prefix does not exist yet */
+            }
+        }
+
+        return false;
+    };
+
+    const conflictError = (message) => {
+        const error = new Error(message);
+        error.code = "BRANCH_EXISTS";
+        return error;
+    };
+
+    const existing = await branchExists();
+
+    if (existing.exists) {
+        throw existing.isDirectory
+            ? conflictError(
+                `Branch "${branchName}" conflicts with an existing branch`
+            )
+            : conflictError(`Branch "${branchName}" already exists`);
+    }
+
+    if (await ancestorIsBranch()) {
+        throw conflictError(
+            `Branch "${branchName}" conflicts with an existing branch`
+        );
     }
 
     const headCommitId = await getHeadCommitId(vcRoot);
@@ -516,8 +583,14 @@ const createBranch = async (repoRoot, branchName) => {
         throw error;
     }
 
-    await fs.promises.mkdir(path.dirname(refPath), { recursive: true });
-    await fs.promises.writeFile(refPath, headCommitId);
+    try {
+        await fs.promises.mkdir(path.dirname(refPath), { recursive: true });
+        await fs.promises.writeFile(refPath, headCommitId);
+    } catch {
+        throw conflictError(
+            `Branch "${branchName}" conflicts with an existing branch`
+        );
+    }
 
     return {
         name: branchName,
@@ -579,12 +652,11 @@ const checkoutBranch = async (
         targetCommitId = null;
     }
 
-    const targetSnapshotRoot = targetCommitId
-        ? getSnapshotRoot(vcRoot, targetCommitId)
+    const target = targetCommitId
+        ? await getSnapshot(vcRoot, targetCommitId)
         : null;
-    const targetFiles = targetSnapshotRoot
-        ? await collectFiles(targetSnapshotRoot, "", ["meta.json"])
-        : [];
+    const targetSnapshotRoot = target ? target.root : null;
+    const targetFiles = target ? target.files : [];
     const targetSet = new Set(targetFiles);
 
     const workingFiles = await collectFiles(
@@ -629,12 +701,954 @@ const checkoutBranch = async (
     };
 };
 
+const MAX_LINE_DIFF_CELLS = 40000;
+const MAX_DIFF_FILE_LINES = 2000;
+
+const getBranchCommitId = async (repoRoot, branchName) => {
+    if (!isValidBranchName(branchName)) {
+        const error = new Error("Invalid branch name");
+        error.code = "INVALID_BRANCH_NAME";
+        throw error;
+    }
+
+    const vcRoot = await ensureVersionControl(repoRoot);
+    const refPath = getBranchRefPath(vcRoot, branchName);
+
+    let raw;
+
+    try {
+        raw = await fs.promises.readFile(refPath, "utf-8");
+    } catch (error) {
+        if (error.code === "ENOENT") {
+            const missing = new Error(
+                `Branch "${branchName}" does not exist`
+            );
+            missing.code = "BRANCH_NOT_FOUND";
+            throw missing;
+        }
+
+        throw error;
+    }
+
+    return raw.trim() || null;
+};
+
+const MAX_TAG_WALK = 5000;
+
+const getTagRefPath = (vcRoot, tagName) =>
+    path.join(vcRoot, "refs", "tags", tagName);
+
+const getTagCommitId = async (repoRoot, tagName) => {
+    if (!isValidTagName(tagName)) {
+        const error = new Error("Invalid tag name");
+        error.code = "INVALID_TAG_NAME";
+        throw error;
+    }
+
+    const vcRoot = await ensureVersionControl(repoRoot);
+    const refPath = getTagRefPath(vcRoot, tagName);
+
+    let raw;
+
+    try {
+        raw = await fs.promises.readFile(refPath, "utf-8");
+    } catch (error) {
+        if (error.code === "ENOENT") {
+            const missing = new Error(`Tag "${tagName}" does not exist`);
+            missing.code = "TAG_NOT_FOUND";
+            throw missing;
+        }
+
+        throw error;
+    }
+
+    return raw.trim() || null;
+};
+
+const listTagRefs = async (repoRoot) => {
+    const vcRoot = await ensureVersionControl(repoRoot);
+    const tagsDir = path.join(vcRoot, "refs", "tags");
+    const names = (await readRefNames(tagsDir)).sort();
+    const tags = [];
+
+    for (const name of names) {
+        let commitId = null;
+
+        try {
+            commitId = (
+                await fs.promises.readFile(
+                    path.join(tagsDir, name),
+                    "utf-8"
+                )
+            ).trim() || null;
+        } catch {
+            commitId = null;
+        }
+
+        tags.push({ name, commitId });
+    }
+
+    return tags;
+};
+
+const createTagRef = async (repoRoot, tagName, commitId) => {
+    if (!isValidTagName(tagName)) {
+        const error = new Error("Invalid tag name");
+        error.code = "INVALID_TAG_NAME";
+        throw error;
+    }
+
+    const vcRoot = await ensureVersionControl(repoRoot);
+    const refPath = getTagRefPath(vcRoot, tagName);
+
+    try {
+        await fs.promises.writeFile(refPath, commitId, { flag: "wx" });
+    } catch (error) {
+        if (error.code === "EEXIST") {
+            const existing = new Error(`Tag "${tagName}" already exists`);
+            existing.code = "TAG_EXISTS";
+            throw existing;
+        }
+
+        throw error;
+    }
+};
+
+const deleteTagRef = async (repoRoot, tagName) => {
+    if (!isValidTagName(tagName)) {
+        const error = new Error("Invalid tag name");
+        error.code = "INVALID_TAG_NAME";
+        throw error;
+    }
+
+    const vcRoot = await ensureVersionControl(repoRoot);
+    const refPath = getTagRefPath(vcRoot, tagName);
+
+    try {
+        await fs.promises.unlink(refPath);
+    } catch (error) {
+        if (error.code === "ENOENT") {
+            const missing = new Error(`Tag "${tagName}" does not exist`);
+            missing.code = "TAG_NOT_FOUND";
+            throw missing;
+        }
+
+        throw error;
+    }
+};
+
+const isAncestorCommit = async (vcRoot, ancestorId, commitId) => {
+    if (!ancestorId || !commitId) {
+        return false;
+    }
+
+    let current = commitId;
+    const visited = new Set();
+
+    while (current) {
+        if (current === ancestorId) {
+            return true;
+        }
+
+        if (visited.has(current)) {
+            return false;
+        }
+
+        visited.add(current);
+
+        const metadata = await readMeta(vcRoot, current);
+
+        if (!metadata) {
+            return false;
+        }
+
+        current = metadata.parent || null;
+    }
+
+    return false;
+};
+
+const getMergeBase = async (vcRoot, aCommitId, bCommitId) => {
+    if (!aCommitId || !bCommitId) {
+        return null;
+    }
+
+    const aAncestors = new Set();
+    let current = aCommitId;
+
+    while (current) {
+        aAncestors.add(current);
+
+        const metadata = await readMeta(vcRoot, current);
+
+        if (!metadata) {
+            break;
+        }
+
+        current = metadata.parent || null;
+    }
+
+    current = bCommitId;
+
+    while (current) {
+        if (aAncestors.has(current)) {
+            return current;
+        }
+
+        const metadata = await readMeta(vcRoot, current);
+
+        if (!metadata) {
+            break;
+        }
+
+        current = metadata.parent || null;
+    }
+
+    return null;
+};
+
+const getCommitsBetween = async (
+    repoRoot,
+    baseCommitId,
+    headCommitId
+) => {
+    if (!headCommitId) {
+        return [];
+    }
+
+    const vcRoot = await ensureVersionControl(repoRoot);
+    const commits = [];
+    let current = headCommitId;
+
+    while (current && current !== baseCommitId) {
+        const metadata = await readMeta(vcRoot, current);
+
+        if (!metadata) {
+            break;
+        }
+
+        commits.push({
+            id: metadata.id || current,
+            message: metadata.message,
+            author: metadata.author,
+            timestamp: metadata.timestamp,
+            parent: metadata.parent
+        });
+
+        current = metadata.parent || null;
+    }
+
+    return commits;
+};
+
+/* find the nearest ancestor of fromCommitId (walking parent chain) that is
+   referenced by one of taggedCommitIds, or null. Bounded to MAX_TAG_WALK
+   steps so a pathological chain cannot stall the request. */
+const findPreviousTaggedCommit = async (
+    repoRoot,
+    fromCommitId,
+    taggedCommitIds
+) => {
+    if (!fromCommitId) {
+        return null;
+    }
+
+    const tagged = new Set(taggedCommitIds || []);
+    const vcRoot = await ensureVersionControl(repoRoot);
+    let current = fromCommitId;
+    let steps = 0;
+
+    while (current && steps < MAX_TAG_WALK) {
+        if (tagged.has(current)) {
+            return current;
+        }
+
+        const metadata = await readMeta(vcRoot, current);
+
+        if (!metadata) {
+            return null;
+        }
+
+        current = metadata.parent || null;
+        steps += 1;
+    }
+
+    return null;
+};
+
+const toLines = (content) => {
+    const lines = content.split("\n");
+
+    if (
+        lines.length > 0 &&
+        lines[lines.length - 1] === ""
+    ) {
+        lines.pop();
+    }
+
+    return lines;
+};
+
+const isBinaryContent = (content) => content.includes("\0");
+
+const computeLineOperations = (oldLines, newLines) => {
+    const n = oldLines.length;
+    const m = newLines.length;
+    const tooLarge =
+        n * m > MAX_LINE_DIFF_CELLS ||
+        n > MAX_DIFF_FILE_LINES ||
+        m > MAX_DIFF_FILE_LINES;
+
+    if (tooLarge) {
+        let prefix = 0;
+
+        while (
+            prefix < n &&
+            prefix < m &&
+            oldLines[prefix] === newLines[prefix]
+        ) {
+            prefix += 1;
+        }
+
+        let suffix = 0;
+
+        while (
+            suffix < n - prefix &&
+            suffix < m - prefix &&
+            oldLines[n - 1 - suffix] === newLines[m - 1 - suffix]
+        ) {
+            suffix += 1;
+        }
+
+        const operations = [];
+        let i = prefix;
+        let j = prefix;
+        let oldLine = prefix + 1;
+        let newLine = prefix + 1;
+
+        for (; i < n - suffix; i += 1) {
+            operations.push({
+                type: "del",
+                text: oldLines[i],
+                oldLine,
+                newLine
+            });
+            oldLine += 1;
+        }
+
+        for (; j < m - suffix; j += 1) {
+            operations.push({
+                type: "add",
+                text: newLines[j],
+                oldLine,
+                newLine
+            });
+            newLine += 1;
+        }
+
+        return { operations, approximate: true };
+    }
+
+    const dp = Array.from(
+        { length: n + 1 },
+        () => new Array(m + 1).fill(0)
+    );
+
+    for (let i = n - 1; i >= 0; i -= 1) {
+        for (let j = m - 1; j >= 0; j -= 1) {
+            dp[i][j] =
+                oldLines[i] === newLines[j]
+                    ? dp[i + 1][j + 1] + 1
+                    : Math.max(dp[i + 1][j], dp[i][j + 1]);
+        }
+    }
+
+    const operations = [];
+    let i = 0;
+    let j = 0;
+    let oldLine = 1;
+    let newLine = 1;
+
+    while (i < n && j < m) {
+        if (oldLines[i] === newLines[j]) {
+            operations.push({
+                type: "context",
+                text: oldLines[i],
+                oldLine,
+                newLine
+            });
+            i += 1;
+            j += 1;
+            oldLine += 1;
+            newLine += 1;
+        } else if (dp[i + 1][j] >= dp[i][j + 1]) {
+            operations.push({
+                type: "del",
+                text: oldLines[i],
+                oldLine,
+                newLine
+            });
+            i += 1;
+            oldLine += 1;
+        } else {
+            operations.push({
+                type: "add",
+                text: newLines[j],
+                oldLine,
+                newLine
+            });
+            j += 1;
+            newLine += 1;
+        }
+    }
+
+    while (i < n) {
+        operations.push({
+            type: "del",
+            text: oldLines[i],
+            oldLine,
+            newLine
+        });
+        i += 1;
+        oldLine += 1;
+    }
+
+    while (j < m) {
+        operations.push({
+            type: "add",
+            text: newLines[j],
+            oldLine,
+            newLine
+        });
+        j += 1;
+        newLine += 1;
+    }
+
+    return { operations, approximate: false };
+};
+
+const buildDiffHunks = (operations, context = 3) => {
+    const hunks = [];
+    let index = 0;
+
+    while (index < operations.length) {
+        while (
+            index < operations.length &&
+            operations[index].type === "context"
+        ) {
+            index += 1;
+        }
+
+        if (index >= operations.length) {
+            break;
+        }
+
+        let end = index;
+        let contextTail = 0;
+
+        while (end < operations.length) {
+            if (operations[end].type === "context") {
+                contextTail += 1;
+
+                if (contextTail > context * 2) {
+                    break;
+                }
+            } else {
+                contextTail = 0;
+            }
+
+            end += 1;
+        }
+
+        let hunkOperations = operations.slice(index, end);
+        let trailing = 0;
+
+        for (
+            let k = hunkOperations.length - 1;
+            k >= 0;
+            k -= 1
+        ) {
+            if (hunkOperations[k].type === "context") {
+                trailing += 1;
+            } else {
+                break;
+            }
+        }
+
+        if (trailing > context) {
+            hunkOperations = hunkOperations.slice(
+                0,
+                hunkOperations.length - (trailing - context)
+            );
+        }
+
+        const hasDeletion = hunkOperations.some(
+            (operation) => operation.type === "del"
+        );
+        const oldStart = hasDeletion
+            ? hunkOperations[0].oldLine
+            : Math.max(0, hunkOperations[0].oldLine - 1);
+        const newStart = hunkOperations[0].newLine;
+        const oldLines = hunkOperations.filter(
+            (operation) => operation.type !== "add"
+        ).length;
+        const newLines = hunkOperations.filter(
+            (operation) => operation.type !== "del"
+        ).length;
+
+        hunks.push({
+            oldStart,
+            oldLines,
+            newStart,
+            newLines,
+            lines: hunkOperations.map((operation) => ({
+                type: operation.type,
+                text: operation.text
+            }))
+        });
+
+        index = end;
+    }
+
+    return hunks;
+};
+
+const buildFullHunk = (lines, type) => ({
+    oldStart: type === "add" ? 0 : 1,
+    oldLines: type === "add" ? 0 : lines.length,
+    newStart: 1,
+    newLines: type === "del" ? 0 : lines.length,
+    lines: lines.map((text) => ({ type, text }))
+});
+
+const getCommitDiff = async (
+    repoRoot,
+    baseCommitId,
+    headCommitId
+) => {
+    const vcRoot = await ensureVersionControl(repoRoot);
+
+    const [baseSnapshot, headSnapshot] = await Promise.all([
+        baseCommitId
+            ? getSnapshot(vcRoot, baseCommitId)
+            : null,
+        headCommitId
+            ? getSnapshot(vcRoot, headCommitId)
+            : null
+    ]);
+
+    const baseFiles = baseSnapshot ? baseSnapshot.files : [];
+    const headFiles = headSnapshot ? headSnapshot.files : [];
+    const baseSet = new Set(baseFiles);
+    const headSet = new Set(headFiles);
+
+    const readLinesFrom = async (snapshot, file) => {
+        const content = await fs.promises.readFile(
+            path.join(snapshot.root, file),
+            "utf-8"
+        );
+        return content;
+    };
+
+    const diffFiles = [];
+    let addedFiles = 0;
+    let modifiedFiles = 0;
+    let deletedFiles = 0;
+    let totalAdditions = 0;
+    let totalDeletions = 0;
+
+    for (const file of headFiles) {
+        if (baseSet.has(file)) {
+            continue;
+        }
+
+        let lines = [];
+
+        if (headSnapshot) {
+            const content = await readLinesFrom(
+                headSnapshot,
+                file
+            );
+
+            if (isBinaryContent(content)) {
+                diffFiles.push({
+                    path: file,
+                    status: "A",
+                    additions: null,
+                    deletions: null,
+                    binary: true,
+                    hunks: []
+                });
+                addedFiles += 1;
+                continue;
+            }
+
+            lines = toLines(content);
+        }
+
+        diffFiles.push({
+            path: file,
+            status: "A",
+            additions: lines.length,
+            deletions: 0,
+            binary: false,
+            hunks: lines.length > 0
+                ? [buildFullHunk(lines, "add")]
+                : []
+        });
+        addedFiles += 1;
+        totalAdditions += lines.length;
+    }
+
+    for (const file of baseFiles) {
+        if (headSet.has(file)) {
+            continue;
+        }
+
+        let lines = [];
+
+        if (baseSnapshot) {
+            const content = await readLinesFrom(
+                baseSnapshot,
+                file
+            );
+
+            if (isBinaryContent(content)) {
+                diffFiles.push({
+                    path: file,
+                    status: "D",
+                    additions: null,
+                    deletions: null,
+                    binary: true,
+                    hunks: []
+                });
+                deletedFiles += 1;
+                continue;
+            }
+
+            lines = toLines(content);
+        }
+
+        diffFiles.push({
+            path: file,
+            status: "D",
+            additions: 0,
+            deletions: lines.length,
+            binary: false,
+            hunks: lines.length > 0
+                ? [buildFullHunk(lines, "del")]
+                : []
+        });
+        deletedFiles += 1;
+        totalDeletions += lines.length;
+    }
+
+    for (const file of headFiles) {
+        if (!baseSet.has(file)) {
+            continue;
+        }
+
+        const [baseContent, headContent] = await Promise.all([
+            readLinesFrom(baseSnapshot, file),
+            readLinesFrom(headSnapshot, file)
+        ]);
+
+        if (baseContent === headContent) {
+            continue;
+        }
+
+        if (
+            isBinaryContent(baseContent) ||
+            isBinaryContent(headContent)
+        ) {
+            diffFiles.push({
+                path: file,
+                status: "M",
+                additions: null,
+                deletions: null,
+                binary: true,
+                hunks: []
+            });
+            modifiedFiles += 1;
+            continue;
+        }
+
+        const baseLines = toLines(baseContent);
+        const headLines = toLines(headContent);
+        const { operations, approximate } =
+            computeLineOperations(baseLines, headLines);
+        const hunks = buildDiffHunks(operations);
+        const additions = operations.filter(
+            (operation) => operation.type === "add"
+        ).length;
+        const deletions = operations.filter(
+            (operation) => operation.type === "del"
+        ).length;
+
+        diffFiles.push({
+            path: file,
+            status: "M",
+            additions,
+            deletions,
+            binary: false,
+            approximate,
+            hunks
+        });
+        modifiedFiles += 1;
+        totalAdditions += additions;
+        totalDeletions += deletions;
+    }
+
+    diffFiles.sort((a, b) => a.path.localeCompare(b.path));
+
+    return {
+        baseCommitId,
+        headCommitId,
+        files: diffFiles,
+        stats: {
+            added: addedFiles,
+            modified: modifiedFiles,
+            deleted: deletedFiles,
+            additions: totalAdditions,
+            deletions: totalDeletions
+        }
+    };
+};
+
+const applySnapshotToWorkingTree = async (
+    repoRoot,
+    vcRoot,
+    commitId
+) => {
+    const target = commitId
+        ? await getSnapshot(vcRoot, commitId)
+        : null;
+    const targetSnapshotRoot = target ? target.root : null;
+    const targetFiles = target ? target.files : [];
+    const targetSet = new Set(targetFiles);
+
+    const workingFiles = await collectFiles(
+        repoRoot,
+        "",
+        [".CommitHub"]
+    );
+
+    for (const file of workingFiles) {
+        if (!targetSet.has(file)) {
+            await fs.promises.rm(
+                path.join(repoRoot, file),
+                { force: true }
+            );
+        }
+    }
+
+    await removeEmptyDirectories(repoRoot, repoRoot);
+
+    if (targetSnapshotRoot) {
+        for (const file of targetFiles) {
+            const source = path.join(targetSnapshotRoot, file);
+            const targetPath = path.join(repoRoot, file);
+
+            await fs.promises.mkdir(
+                path.dirname(targetPath),
+                { recursive: true }
+            );
+            await fs.promises.copyFile(source, targetPath);
+        }
+    }
+};
+
+const fastForwardMerge = async (
+    repoRoot,
+    sourceBranch,
+    targetBranch
+) => {
+    if (!isValidBranchName(sourceBranch)) {
+        const error = new Error("Invalid source branch name");
+        error.code = "INVALID_BRANCH_NAME";
+        throw error;
+    }
+
+    if (!isValidBranchName(targetBranch)) {
+        const error = new Error("Invalid target branch name");
+        error.code = "INVALID_BRANCH_NAME";
+        throw error;
+    }
+
+    if (sourceBranch === targetBranch) {
+        const error = new Error(
+            "Source and target branches must be different"
+        );
+        error.code = "SAME_BRANCH";
+        throw error;
+    }
+
+    const vcRoot = await ensureVersionControl(repoRoot);
+
+    const readBranchCommit = async (branch) => {
+        const refPath = getBranchRefPath(vcRoot, branch);
+
+        try {
+            const raw = await fs.promises.readFile(
+                refPath,
+                "utf-8"
+            );
+            return raw.trim() || null;
+        } catch (error) {
+            if (error.code === "ENOENT") {
+                const missing = new Error(
+                    `Branch "${branch}" does not exist`
+                );
+                missing.code = "BRANCH_NOT_FOUND";
+                throw missing;
+            }
+
+            throw error;
+        }
+    };
+
+    const sourceCommitId = await readBranchCommit(sourceBranch);
+    const targetCommitId = await readBranchCommit(targetBranch);
+
+    if (!sourceCommitId) {
+        const error = new Error(
+            `Branch "${sourceBranch}" has no commits`
+        );
+        error.code = "BRANCH_HAS_NO_COMMITS";
+        throw error;
+    }
+
+    if (!targetCommitId) {
+        const error = new Error(
+            `Branch "${targetBranch}" has no commits`
+        );
+        error.code = "BRANCH_HAS_NO_COMMITS";
+        throw error;
+    }
+
+    if (
+        await isAncestorCommit(
+            vcRoot,
+            sourceCommitId,
+            targetCommitId
+        )
+    ) {
+        return {
+            merged: false,
+            reason: "ALREADY_UP_TO_DATE",
+            sourceBranch,
+            targetBranch,
+            sourceCommitId,
+            targetCommitId
+        };
+    }
+
+    const baseCommitId = await getMergeBase(
+        vcRoot,
+        sourceCommitId,
+        targetCommitId
+    );
+
+    if (baseCommitId !== targetCommitId) {
+        const error = new Error(
+            `Branches "${sourceBranch}" and "${targetBranch}" have diverged; a fast-forward merge is not possible`
+        );
+        error.code = "DIVERGED";
+        throw error;
+    }
+
+    const currentBranch = await getCurrentBranch(vcRoot);
+    const updateWorkingTree = currentBranch === targetBranch;
+
+    if (updateWorkingTree) {
+        const changes = await getWorkingTreeChanges(repoRoot);
+
+        if (changes.length > 0) {
+            const error = new Error(
+                "Cannot merge into a checked-out branch with uncommitted changes"
+            );
+            error.code = "DIRTY_TREE";
+            throw error;
+        }
+    }
+
+    await fs.promises.writeFile(
+        getBranchRefPath(vcRoot, targetBranch),
+        sourceCommitId
+    );
+
+    if (updateWorkingTree) {
+        await applySnapshotToWorkingTree(
+            repoRoot,
+            vcRoot,
+            sourceCommitId
+        );
+    }
+
+    return {
+        merged: true,
+        fastForward: true,
+        sourceBranch,
+        targetBranch,
+        sourceCommitId,
+        targetCommitId: sourceCommitId,
+        previousTargetCommitId: targetCommitId,
+        baseCommitId,
+        workingTreeUpdated: updateWorkingTree
+    };
+};
+
+const restoreBranchRef = async (
+    repoRoot,
+    branchName,
+    expectedCommitId,
+    commitId
+) => {
+    if (!isValidBranchName(branchName)) {
+        const error = new Error("Invalid branch name");
+        error.code = "INVALID_BRANCH_NAME";
+        throw error;
+    }
+
+    const vcRoot = await ensureVersionControl(repoRoot);
+    const refPath = getBranchRefPath(vcRoot, branchName);
+
+    let current = null;
+
+    try {
+        current = (
+            await fs.promises.readFile(refPath, "utf-8")
+        ).trim();
+    } catch {
+        return false;
+    }
+
+    if (current !== expectedCommitId) {
+        return false;
+    }
+
+    await fs.promises.writeFile(refPath, commitId);
+
+    const currentBranch = await getCurrentBranch(vcRoot);
+
+    if (currentBranch === branchName) {
+        await applySnapshotToWorkingTree(
+            repoRoot,
+            vcRoot,
+            commitId
+        );
+    }
+
+    return true;
+};
+
 export {
     MAX_COMMIT_MESSAGE_LENGTH,
     DEFAULT_HISTORY_LIMIT,
     MAX_HISTORY_LIMIT,
     isValidCommitId,
     isValidBranchName,
+    isValidTagName,
     ensureVersionControl,
     getCurrentBranch,
     getHeadCommitId,
@@ -644,5 +1658,15 @@ export {
     getCommitHistory,
     listBranches,
     createBranch,
-    checkoutBranch
+    checkoutBranch,
+    getBranchCommitId,
+    getTagCommitId,
+    listTagRefs,
+    createTagRef,
+    deleteTagRef,
+    findPreviousTaggedCommit,
+    getCommitsBetween,
+    getCommitDiff,
+    fastForwardMerge,
+    restoreBranchRef
 };
