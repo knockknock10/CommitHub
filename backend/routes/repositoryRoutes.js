@@ -37,6 +37,21 @@ import {
     reopenPullRequest,
     submitReview
 } from "../controllers/pullRequestController.js";
+import {
+    createTag,
+    deleteTag,
+    getTag,
+    getTags
+} from "../controllers/tagController.js";
+import {
+    createRelease,
+    getReleaseById,
+    getReleases,
+    updateRelease
+} from "../controllers/releaseController.js";
+import {
+    getRepositoryActivity
+} from "../controllers/activityController.js";
 
 const router = express.Router();
 
@@ -106,6 +121,25 @@ router.route("/:id/pull-requests/:number/comments")
 
 router.route("/:id/pull-requests/:number/merge")
 .post(protect, mergePullRequest);
+
+router.route("/:id/tags")
+.get(protect, getTags)
+.post(protect, createTag);
+
+router.route("/:id/tags/:tagName")
+.get(protect, getTag)
+.delete(protect, deleteTag);
+
+router.route("/:id/releases")
+.get(protect, getReleases)
+.post(protect, createRelease);
+
+router.route("/:id/releases/:releaseId")
+.get(protect, getReleaseById)
+.patch(protect, updateRelease);
+
+router.route("/:id/activity")
+.get(protect, getRepositoryActivity);
 
 
 export default router;

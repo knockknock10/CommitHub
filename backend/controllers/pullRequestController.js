@@ -9,6 +9,12 @@ import {
     fastForwardMerge,
     restoreBranchRef
 } from "../utils/repoVersion.js";
+import {
+    createNotification,
+    createMentionNotifications,
+    buildNotificationMessage
+} from "../utils/notificationService.js";
+import { createActivity } from "../utils/activityService.js";
 
 const TITLE_MAX_LENGTH = 200;
 const REVIEW_COMMENT_MAX_LENGTH = 500;
@@ -147,6 +153,32 @@ export const createPullRequest = async (req, res) => {
         const populated = await PullRequest.findById(
             pullRequest._id
         ).populate("author", "userName email");
+
+        await createNotification({
+            recipient: result.repository.owner,
+            actor: req.user._id,
+            type: "PR_CREATED",
+            repository: result.repository._id,
+            pullRequest: pullRequest._id,
+            message: buildNotificationMessage(
+                "PR_CREATED",
+                {
+                    title: trimmedTitle,
+                    number: pullRequest.number
+                }
+            )
+        });
+
+        await createActivity({
+            actor: req.user._id,
+            type: "PR_CREATED",
+            repository: result.repository._id,
+            pullRequest: pullRequest._id,
+            metadata: {
+                pullRequestNumber: pullRequest.number,
+                pullRequestTitle: trimmedTitle
+            }
+        });
 
         return res.status(201).json(populated);
     } catch (error) {
@@ -497,6 +529,32 @@ export const submitReview = async (req, res) => {
 
         await pullRequest.save();
 
+        await createNotification({
+            recipient: pullRequest.author,
+            actor: req.user._id,
+            type: "PR_REVIEWED",
+            repository: result.repository._id,
+            pullRequest: pullRequest._id,
+            message: buildNotificationMessage(
+                "PR_REVIEWED",
+                {
+                    title: pullRequest.title,
+                    number: pullRequest.number
+                }
+            )
+        });
+
+        await createActivity({
+            actor: req.user._id,
+            type: "PR_REVIEWED",
+            repository: result.repository._id,
+            pullRequest: pullRequest._id,
+            metadata: {
+                pullRequestNumber: pullRequest.number,
+                reviewState: state
+            }
+        });
+
         const populated = await PullRequest.findById(
             pullRequest._id
         ).populate("reviews.reviewer", "userName email");
@@ -556,6 +614,37 @@ export const addPullRequestComment = async (req, res) => {
         });
 
         await pullRequest.save();
+
+        await createNotification({
+            recipient: pullRequest.author,
+            actor: req.user._id,
+            type: "PR_COMMENTED",
+            repository: result.repository._id,
+            pullRequest: pullRequest._id,
+            message: buildNotificationMessage(
+                "PR_COMMENTED",
+                {
+                    title: pullRequest.title,
+                    number: pullRequest.number
+                }
+            )
+        });
+
+        await createMentionNotifications({
+            content,
+            actor: req.user._id,
+            repository: result.repository._id,
+            pullRequest,
+            excludeRecipients: [pullRequest.author]
+        });
+
+        await createActivity({
+            actor: req.user._id,
+            type: "PR_COMMENTED",
+            repository: result.repository._id,
+            pullRequest: pullRequest._id,
+            metadata: { pullRequestNumber: pullRequest.number }
+        });
 
         const populated = await PullRequest.findById(
             pullRequest._id
@@ -726,6 +815,32 @@ export const mergePullRequest = async (req, res) => {
 
             throw error;
         }
+
+        await createNotification({
+            recipient: pullRequest.author,
+            actor: req.user._id,
+            type: "PR_MERGED",
+            repository: result.repository._id,
+            pullRequest: pullRequest._id,
+            message: buildNotificationMessage(
+                "PR_MERGED",
+                {
+                    title: pullRequest.title,
+                    number: pullRequest.number
+                }
+            )
+        });
+
+        await createActivity({
+            actor: req.user._id,
+            type: "PR_MERGED",
+            repository: result.repository._id,
+            pullRequest: pullRequest._id,
+            metadata: {
+                pullRequestNumber: pullRequest.number,
+                pullRequestTitle: pullRequest.title
+            }
+        });
 
         return res.status(200).json({
             message: "Pull request merged",

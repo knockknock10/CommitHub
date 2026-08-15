@@ -15,6 +15,11 @@ import {
     assertRealPathWithin
 } from "../utils/repoStorage.js";
 import { authorizeRepository } from "../utils/repoAccess.js";
+import {
+    createNotification,
+    buildNotificationMessage
+} from "../utils/notificationService.js";
+import { createActivity } from "../utils/activityService.js";
 
 const isVersionControlPath = (root, target) => {
     const relative = path.relative(root, target);
@@ -154,6 +159,22 @@ export const starRepository = async (req, res) => {
                 { _id: repository._id },
                 { $inc: { stars: 1 } }
             );
+
+            await createNotification({
+                recipient: repository.owner,
+                actor: req.user._id,
+                type: "REPOSITORY_STARRED",
+                repository: repository._id,
+                message: buildNotificationMessage(
+                    "REPOSITORY_STARRED"
+                )
+            });
+
+            await createActivity({
+                actor: req.user._id,
+                type: "REPOSITORY_STARRED",
+                repository: repository._id
+            });
         }
 
         res.status(200).json({
@@ -270,6 +291,12 @@ export const createRepository = async (req, res) => {
                 message: "Server error"
             });
         }
+
+        await createActivity({
+            actor: req.user._id,
+            type: "REPOSITORY_CREATED",
+            repository: repository._id
+        });
 
         res.status(201).json(repository);
     } catch (error) {

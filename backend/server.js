@@ -9,6 +9,7 @@ import commentRoutes from "./routes/commentRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import searchRoutes from "./routes/searchRoutes.js";
 import notificationRoutes from "./routes/notificationRoutes.js";
+import activityRoutes from "./routes/activityRoutes.js";
 
 dotenv.config();
 
@@ -31,6 +32,8 @@ app.use("/api/comments", commentRoutes);
 app.use("/api/users", userRoutes);
 
 app.use("/api/notifications", notificationRoutes);
+
+app.use("/api/activity", activityRoutes);
 
 app.use(
     "/api/search",
