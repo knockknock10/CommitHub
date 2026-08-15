@@ -833,4 +833,26 @@ describe("working tree changes", () => {
 
         assert.equal(response.status, 403);
     });
+
+    it("recognizes a working-tree file named meta.json as committed", async () => {
+        const repo = await createRepo("myrepo");
+        await writeRepoFile(repo, "meta.json", "not commit metadata");
+
+        await createCommitRequest(
+            repo,
+            { message: "first" },
+            ownerToken
+        );
+
+        const response = await getRequest(
+            `/api/repositories/${repo._id}/changes`,
+            ownerToken
+        );
+
+        assert.equal(response.status, 200);
+
+        const body = await response.json();
+
+        assert.deepEqual(body.changes, []);
+    });
 });
