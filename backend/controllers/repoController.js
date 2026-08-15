@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import fs from "fs";
 import path from "path";
+import crypto from "crypto";
 import User from "../models/userModel.js";
 import Repository from "../models/repoModel.js";
 import Issue from "../models/issueMode.js";
@@ -13,6 +14,105 @@ import {
     resolveRepoPath,
     assertRealPathWithin
 } from "../utils/repoStorage.js";
+import { authorizeRepository } from "../utils/repoAccess.js";
+
+const isVersionControlPath = (root, target) => {
+    const relative = path.relative(root, target);
+
+    return (
+        relative === ".CommitHub" ||
+        relative.startsWith(".CommitHub" + path.sep)
+    );
+};
+
+/* resolve a repository-relative path for a file/directory operation.
+   Rejects absolute paths, traversal, the repository root itself, and
+   anything inside .CommitHub. */
+const resolveManagedPath = (root, requestedPath) => {
+    if (typeof requestedPath !== "string" || requestedPath.trim() === "") {
+        return null;
+    }
+
+    const safePath = resolveRepoPath(root, requestedPath);
+
+    if (!safePath || safePath === root) {
+        return null;
+    }
+
+    if (isVersionControlPath(root, safePath)) {
+        return null;
+    }
+
+    return safePath;
+};
+
+/* verify that every already-existing path component between the target and
+   the repository root resolves inside the repository, so a symlink can never
+   redirect a write outside the repository. lstat is used so a dangling
+   symlink counts as "existing" and is rejected by the realpath check. */
+const assertAncestorsWithinRoot = async (root, target) => {
+    let current = target;
+
+    while (current !== root) {
+        try {
+            await fs.promises.lstat(current);
+            break;
+        } catch {
+            current = path.dirname(current);
+        }
+    }
+
+    if (current === root) {
+        return;
+    }
+
+    assertRealPathWithin(root, current);
+};
+
+const hashContent = (content) =>
+    crypto.createHash("sha1").update(content).digest("hex");
+
+const readTextFile = async (safePath) => {
+    const stat = await fs.promises.stat(safePath);
+
+    if (stat.size > MAX_FILE_SIZE) {
+        const error = new Error("File is too large to view");
+        error.code = "TOO_LARGE";
+        throw error;
+    }
+
+    const content = await fs.promises.readFile(safePath, "utf8");
+
+    if (content.includes("\0")) {
+        const error = new Error("Binary file cannot be viewed");
+        error.code = "BINARY_FILE";
+        throw error;
+    }
+
+    return { content, stat };
+};
+
+const validateWriteContent = (content) => {
+    if (typeof content !== "string") {
+        const error = new Error("File content must be a string");
+        error.code = "CONTENT_TYPE";
+        throw error;
+    }
+
+    if (Buffer.byteLength(content, "utf8") > MAX_FILE_SIZE) {
+        const error = new Error("File is too large");
+        error.code = "TOO_LARGE";
+        throw error;
+    }
+
+    if (content.includes("\0")) {
+        const error = new Error("Binary file content is not supported");
+        error.code = "BINARY_FILE";
+        throw error;
+    }
+
+    return content;
+};
 
 /* star repository */
 export const starRepository = async (req, res) => {
@@ -297,6 +397,12 @@ export const getRepositoryTree = async (req, res) => {
             });
         }
 
+        if (isVersionControlPath(root, safePath)) {
+            return res.status(404).json({
+                message: "Path not found"
+            });
+        }
+
         let stat;
 
         try {
@@ -343,6 +449,7 @@ export const getRepositoryTree = async (req, res) => {
                 name,
                 type: isDirectory ? "folder" : "file",
                 path: requestedPath ? `${requestedPath}/${name}` : name,
+                updatedAt: entryStat.mtimeMs,
                 ...(isDirectory ? {} : { size: entryStat.size })
             });
         }
@@ -411,6 +518,12 @@ export const getRepositoryFile = async (req, res) => {
             });
         }
 
+        if (isVersionControlPath(root, safePath)) {
+            return res.status(404).json({
+                message: "File not found"
+            });
+        }
+
         let stat;
 
         try {
@@ -435,25 +548,499 @@ export const getRepositoryFile = async (req, res) => {
             });
         }
 
-        if (stat.size > MAX_FILE_SIZE) {
-            return res.status(413).json({
-                message: "File is too large to view"
-            });
-        }
+        let content;
 
-        const content = await fs.promises.readFile(safePath, "utf8");
+        try {
+            ({ content } = await readTextFile(safePath));
+        } catch (error) {
+            if (error.code === "TOO_LARGE") {
+                return res.status(413).json({
+                    message: "File is too large to view"
+                });
+            }
 
-        if (content.includes("\0")) {
-            return res.status(400).json({
-                message: "Binary file cannot be viewed"
-            });
+            if (error.code === "BINARY_FILE") {
+                return res.status(400).json({
+                    message: "Binary file cannot be viewed"
+                });
+            }
+
+            throw error;
         }
 
         return res.status(200).json({
             path: requestedPath,
             name: path.basename(safePath),
             content,
-            size: stat.size
+            size: stat.size,
+            updatedAt: stat.mtimeMs,
+            hash: hashContent(content)
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: "Server error"
+        });
+    }
+};
+
+/* create file */
+export const createRepositoryFile = async (req, res) => {
+    try {
+        const result = await authorizeRepository(req, res, true);
+
+        if (!result) {
+            return;
+        }
+
+        const requestedPath =
+            typeof req.body?.path === "string"
+                ? req.body.path.trim()
+                : "";
+
+        if (requestedPath === "") {
+            return res.status(400).json({
+                message: "A file path is required"
+            });
+        }
+
+        let content;
+
+        try {
+            content = validateWriteContent(req.body?.content);
+        } catch (error) {
+            if (error.code === "CONTENT_TYPE") {
+                return res.status(400).json({
+                    message: "File content must be a string"
+                });
+            }
+
+            if (error.code === "BINARY_FILE") {
+                return res.status(400).json({
+                    message: "Binary file content is not supported"
+                });
+            }
+
+            if (error.code === "TOO_LARGE") {
+                return res.status(413).json({
+                    message: "File is too large"
+                });
+            }
+
+            throw error;
+        }
+
+        const root = getRepoRoot(
+            result.repository.owner,
+            result.repository._id
+        );
+        const safePath = resolveManagedPath(root, requestedPath);
+
+        if (!safePath) {
+            return res.status(400).json({
+                message: "Invalid path"
+            });
+        }
+
+        await ensureRepoStorageDir(
+            result.repository.owner,
+            result.repository._id
+        );
+
+        try {
+            await fs.promises.lstat(safePath);
+
+            return res.status(400).json({
+                message: "File already exists"
+            });
+        } catch (error) {
+            /* path is free — continue */
+        }
+
+        try {
+            await assertAncestorsWithinRoot(root, safePath);
+        } catch (error) {
+            return res.status(400).json({
+                message: "Invalid path"
+            });
+        }
+
+        await fs.promises.mkdir(
+            path.dirname(safePath),
+            { recursive: true }
+        );
+        await fs.promises.writeFile(safePath, content);
+
+        const stat = await fs.promises.stat(safePath);
+
+        return res.status(201).json({
+            path: requestedPath,
+            name: path.basename(safePath),
+            size: stat.size,
+            updatedAt: stat.mtimeMs
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: "Server error"
+        });
+    }
+};
+
+/* edit file */
+export const updateRepositoryFile = async (req, res) => {
+    try {
+        const result = await authorizeRepository(req, res, true);
+
+        if (!result) {
+            return;
+        }
+
+        const requestedPath =
+            typeof req.body?.path === "string"
+                ? req.body.path.trim()
+                : "";
+
+        if (requestedPath === "") {
+            return res.status(400).json({
+                message: "A file path is required"
+            });
+        }
+
+        let content;
+
+        try {
+            content = validateWriteContent(req.body?.content);
+        } catch (error) {
+            if (error.code === "CONTENT_TYPE") {
+                return res.status(400).json({
+                    message: "File content must be a string"
+                });
+            }
+
+            if (error.code === "BINARY_FILE") {
+                return res.status(400).json({
+                    message: "Binary file content is not supported"
+                });
+            }
+
+            if (error.code === "TOO_LARGE") {
+                return res.status(413).json({
+                    message: "File is too large"
+                });
+            }
+
+            throw error;
+        }
+
+        const root = getRepoRoot(
+            result.repository.owner,
+            result.repository._id
+        );
+        const safePath = resolveManagedPath(root, requestedPath);
+
+        if (!safePath) {
+            return res.status(400).json({
+                message: "Invalid path"
+            });
+        }
+
+        await ensureRepoStorageDir(
+            result.repository.owner,
+            result.repository._id
+        );
+
+        let stat;
+
+        try {
+            stat = await fs.promises.stat(safePath);
+        } catch (error) {
+            return res.status(404).json({
+                message: "File not found"
+            });
+        }
+
+        if (stat.isDirectory()) {
+            return res.status(400).json({
+                message: "Path is a directory"
+            });
+        }
+
+        try {
+            assertRealPathWithin(root, safePath);
+        } catch (error) {
+            return res.status(400).json({
+                message: "Invalid path"
+            });
+        }
+
+        const expectedHash =
+            typeof req.body?.expectedHash === "string"
+                ? req.body.expectedHash
+                : null;
+
+        if (expectedHash) {
+            const currentContent = await fs.promises.readFile(
+                safePath,
+                "utf8"
+            );
+
+            if (hashContent(currentContent) !== expectedHash) {
+                return res.status(409).json({
+                    message: "File has been modified since it was loaded"
+                });
+            }
+        }
+
+        await fs.promises.writeFile(safePath, content);
+
+        const updatedStat = await fs.promises.stat(safePath);
+
+        return res.status(200).json({
+            path: requestedPath,
+            name: path.basename(safePath),
+            size: updatedStat.size,
+            updatedAt: updatedStat.mtimeMs,
+            hash: hashContent(content)
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: "Server error"
+        });
+    }
+};
+
+/* delete file */
+export const deleteRepositoryFile = async (req, res) => {
+    try {
+        const result = await authorizeRepository(req, res, true);
+
+        if (!result) {
+            return;
+        }
+
+        const requestedPath = req.query.path;
+
+        if (typeof requestedPath !== "string" || requestedPath.trim() === "") {
+            return res.status(400).json({
+                message: "A file path is required"
+            });
+        }
+
+        const root = getRepoRoot(
+            result.repository.owner,
+            result.repository._id
+        );
+        const safePath = resolveManagedPath(root, requestedPath);
+
+        if (!safePath) {
+            return res.status(400).json({
+                message: "Invalid path"
+            });
+        }
+
+        await ensureRepoStorageDir(
+            result.repository.owner,
+            result.repository._id
+        );
+
+        let stat;
+
+        try {
+            stat = await fs.promises.stat(safePath);
+        } catch (error) {
+            return res.status(404).json({
+                message: "File not found"
+            });
+        }
+
+        if (stat.isDirectory()) {
+            return res.status(400).json({
+                message: "Path is a directory"
+            });
+        }
+
+        try {
+            assertRealPathWithin(root, safePath);
+        } catch (error) {
+            return res.status(400).json({
+                message: "Invalid path"
+            });
+        }
+
+        await fs.promises.rm(safePath, { force: true });
+
+        return res.status(200).json({
+            message: "File deleted",
+            path: requestedPath
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: "Server error"
+        });
+    }
+};
+
+/* create directory */
+export const createRepositoryDirectory = async (req, res) => {
+    try {
+        const result = await authorizeRepository(req, res, true);
+
+        if (!result) {
+            return;
+        }
+
+        const requestedPath =
+            typeof req.body?.path === "string"
+                ? req.body.path.trim()
+                : "";
+
+        if (requestedPath === "") {
+            return res.status(400).json({
+                message: "A directory path is required"
+            });
+        }
+
+        const root = getRepoRoot(
+            result.repository.owner,
+            result.repository._id
+        );
+        const safePath = resolveManagedPath(root, requestedPath);
+
+        if (!safePath) {
+            return res.status(400).json({
+                message: "Invalid path"
+            });
+        }
+
+        await ensureRepoStorageDir(
+            result.repository.owner,
+            result.repository._id
+        );
+
+        try {
+            await fs.promises.lstat(safePath);
+
+            return res.status(400).json({
+                message: "Directory already exists"
+            });
+        } catch (error) {
+            /* path is free — continue */
+        }
+
+        const parent = path.dirname(safePath);
+        let parentStat;
+
+        try {
+            parentStat = await fs.promises.stat(parent);
+        } catch (error) {
+            return res.status(400).json({
+                message: "Parent directory does not exist"
+            });
+        }
+
+        if (!parentStat.isDirectory()) {
+            return res.status(400).json({
+                message: "Parent path is not a directory"
+            });
+        }
+
+        try {
+            assertRealPathWithin(root, parent);
+        } catch (error) {
+            return res.status(400).json({
+                message: "Invalid path"
+            });
+        }
+
+        await fs.promises.mkdir(safePath);
+
+        return res.status(201).json({
+            path: requestedPath,
+            name: path.basename(safePath)
+        });
+    } catch (error) {
+        if (error.code === "EEXIST") {
+            return res.status(400).json({
+                message: "Directory already exists"
+            });
+        }
+
+        return res.status(500).json({
+            message: "Server error"
+        });
+    }
+};
+
+/* delete directory (empty directories only) */
+export const deleteRepositoryDirectory = async (req, res) => {
+    try {
+        const result = await authorizeRepository(req, res, true);
+
+        if (!result) {
+            return;
+        }
+
+        const requestedPath = req.query.path;
+
+        if (typeof requestedPath !== "string" || requestedPath.trim() === "") {
+            return res.status(400).json({
+                message: "A directory path is required"
+            });
+        }
+
+        const root = getRepoRoot(
+            result.repository.owner,
+            result.repository._id
+        );
+        const safePath = resolveManagedPath(root, requestedPath);
+
+        if (!safePath) {
+            return res.status(400).json({
+                message: "Invalid path"
+            });
+        }
+
+        await ensureRepoStorageDir(
+            result.repository.owner,
+            result.repository._id
+        );
+
+        let stat;
+
+        try {
+            stat = await fs.promises.stat(safePath);
+        } catch (error) {
+            return res.status(404).json({
+                message: "Directory not found"
+            });
+        }
+
+        if (!stat.isDirectory()) {
+            return res.status(400).json({
+                message: "Path is not a directory"
+            });
+        }
+
+        try {
+            assertRealPathWithin(root, safePath);
+        } catch (error) {
+            return res.status(400).json({
+                message: "Invalid path"
+            });
+        }
+
+        const names = await fs.promises.readdir(safePath);
+
+        if (names.length > 0) {
+            return res.status(400).json({
+                message: "Directory is not empty"
+            });
+        }
+
+        await fs.promises.rmdir(safePath);
+
+        return res.status(200).json({
+            message: "Directory deleted",
+            path: requestedPath
         });
     } catch (error) {
         return res.status(500).json({
