@@ -31,7 +31,11 @@ const RepoSchema = new mongoose.Schema({
         {
             type: String
         }
-    ]
+    ],
+    prCount: {
+        type: Number,
+        default: 0
+    }
 }, {
     timestamps: true
 });
