@@ -8,6 +8,7 @@ import issueRoutes from "./routes/issueRoutes.js";
 import commentRoutes from "./routes/commentRoutes.js";
 import userRoutes from "./routes/userRoutes.js";
 import searchRoutes from "./routes/searchRoutes.js";
+import notificationRoutes from "./routes/notificationRoutes.js";
 
 dotenv.config();
 
@@ -28,6 +29,8 @@ app.use("/api/issues", issueRoutes);
 
 app.use("/api/comments", commentRoutes);
 app.use("/api/users", userRoutes);
+
+app.use("/api/notifications", notificationRoutes);
 
 app.use(
     "/api/search",
