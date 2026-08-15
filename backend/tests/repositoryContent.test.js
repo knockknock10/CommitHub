@@ -322,6 +322,23 @@ describe("getRepositoryTree", () => {
 
         assert.equal(response.status, 400);
     });
+
+    it("does not expose the version control directory via the tree", async () => {
+        const repo = await createRepo("myrepo");
+        await writeRepoFile(repo, "README.md", "# Hello");
+
+        const root = await getRequest(
+            `/api/repositories/${repo._id}/tree?path=${encodeURIComponent(".CommitHub")}`,
+            ownerToken
+        );
+        const nested = await getRequest(
+            `/api/repositories/${repo._id}/tree?path=${encodeURIComponent(".CommitHub/refs/heads")}`,
+            ownerToken
+        );
+
+        assert.equal(root.status, 404);
+        assert.equal(nested.status, 404);
+    });
 });
 
 describe("getRepositoryFile", () => {
@@ -481,5 +498,22 @@ describe("getRepositoryFile", () => {
         );
 
         assert.equal(response.status, 400);
+    });
+
+    it("does not expose version control files via the file endpoint", async () => {
+        const repo = await createRepo("myrepo");
+        await writeRepoFile(repo, "README.md", "# Hello");
+
+        const head = await getRequest(
+            `/api/repositories/${repo._id}/file?path=${encodeURIComponent(".CommitHub/HEAD")}`,
+            ownerToken
+        );
+        const root = await getRequest(
+            `/api/repositories/${repo._id}/file?path=${encodeURIComponent(".CommitHub")}`,
+            ownerToken
+        );
+
+        assert.equal(head.status, 404);
+        assert.equal(root.status, 404);
     });
 });
