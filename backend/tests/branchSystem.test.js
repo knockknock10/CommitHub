@@ -486,6 +486,56 @@ describe("branch creation", () => {
             1
         );
     });
+
+    it("rejects a branch name that is a prefix of an existing branch", async () => {
+        const repo = await createRepo("myrepo");
+        await writeRepoFile(repo, "a.txt", "one");
+        await commitHeadCommit(repo);
+
+        await createBranchRequest(
+            repo,
+            { name: "feature/x" },
+            ownerToken
+        );
+
+        const response = await createBranchRequest(
+            repo,
+            { name: "feature" },
+            ownerToken
+        );
+
+        assert.equal(response.status, 400);
+
+        const stored = await Repository.findById(repo._id);
+
+        assert.ok(stored.branches.includes("feature/x"));
+        assert.ok(!stored.branches.includes("feature"));
+    });
+
+    it("rejects a branch name nested under an existing branch", async () => {
+        const repo = await createRepo("myrepo");
+        await writeRepoFile(repo, "a.txt", "one");
+        await commitHeadCommit(repo);
+
+        await createBranchRequest(
+            repo,
+            { name: "feature" },
+            ownerToken
+        );
+
+        const response = await createBranchRequest(
+            repo,
+            { name: "feature/x" },
+            ownerToken
+        );
+
+        assert.equal(response.status, 400);
+
+        const stored = await Repository.findById(repo._id);
+
+        assert.ok(stored.branches.includes("feature"));
+        assert.ok(!stored.branches.includes("feature/x"));
+    });
 });
 
 describe("branch checkout", () => {
