@@ -2,14 +2,19 @@ import express from "express";
 import protect from "../middleware/authmiddleware.js";
 import {
     createRepository,
+    createRepositoryDirectory,
+    createRepositoryFile,
     deleteRepository,
+    deleteRepositoryDirectory,
+    deleteRepositoryFile,
     getRepositories,
     getRepositoryById,
     getRepositoryFile,
     getRepositoryTree,
     starRepository,
     unstarRepository,
-    updateRepository
+    updateRepository,
+    updateRepositoryFile
 } from "../controllers/repoController.js";
 import {
     createCommit,
@@ -22,6 +27,16 @@ import {
     createBranch,
     listBranches
 } from "../controllers/branchController.js";
+import {
+    addPullRequestComment,
+    closePullRequest,
+    createPullRequest,
+    getPullRequestById,
+    getPullRequests,
+    mergePullRequest,
+    reopenPullRequest,
+    submitReview
+} from "../controllers/pullRequestController.js";
 
 const router = express.Router();
 
@@ -38,7 +53,14 @@ router.route("/:id/tree")
 .get(protect, getRepositoryTree);
 
 router.route("/:id/file")
-.get(protect, getRepositoryFile);
+.get(protect, getRepositoryFile)
+.post(protect, createRepositoryFile)
+.put(protect, updateRepositoryFile)
+.delete(protect, deleteRepositoryFile);
+
+router.route("/:id/directory")
+.post(protect, createRepositoryDirectory)
+.delete(protect, deleteRepositoryDirectory);
 
 router.route("/:id/star")
 .patch(protect, starRepository);
@@ -62,6 +84,28 @@ router.route("/:id/branches")
 
 router.route("/:id/branches/checkout")
 .post(protect, checkoutBranch);
+
+router.route("/:id/pull-requests")
+.get(protect, getPullRequests)
+.post(protect, createPullRequest);
+
+router.route("/:id/pull-requests/:number")
+.get(protect, getPullRequestById);
+
+router.route("/:id/pull-requests/:number/close")
+.post(protect, closePullRequest);
+
+router.route("/:id/pull-requests/:number/reopen")
+.post(protect, reopenPullRequest);
+
+router.route("/:id/pull-requests/:number/reviews")
+.post(protect, submitReview);
+
+router.route("/:id/pull-requests/:number/comments")
+.post(protect, addPullRequestComment);
+
+router.route("/:id/pull-requests/:number/merge")
+.post(protect, mergePullRequest);
 
 
 export default router;
