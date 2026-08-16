@@ -1,37 +1,19 @@
 import DashboardLayout from "../components/dashboard/DashboardLayout";
+import ActivityItem from "../components/activity/ActivityItem";
 import { fetchRepositories } from "../api/repositoryApi.js";
+import { fetchActivity } from "../api/activityApi.js";
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import "../styles/dashboard.css";
 
-const activities = [
-    {
-        title: "pushed changes to commithub-frontend",
-        detail: "updated dashboard layout and repository cards",
-        time: "12 minutes ago",
-    },
-    {
-        title: "created branch feature/repo-page",
-        detail: "new branch created from main",
-        time: "48 minutes ago",
-    },
-    {
-        title: "resolved issue #18",
-        detail: "fixed authentication redirect behavior",
-        time: "2 hours ago",
-    },
-    {
-        title: "merged pull request #7",
-        detail: "added protected route support",
-        time: "yesterday",
-    },
-];
-
 const Dashboard = () => {
     const [repositories, setRepositories] = useState([]);
+    const [activities, setActivities] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [activityLoading, setActivityLoading] = useState(true);
     const [error, setError] = useState("");
+    const [activityError, setActivityError] = useState("");
     const navigate = useNavigate();
 
     useEffect(() => {
@@ -46,6 +28,20 @@ const Dashboard = () => {
             }
         };
         loadRepositories();
+    }, []);
+
+    useEffect(() => {
+        const loadActivity = async () => {
+            try {
+                const data = await fetchActivity({ limit: 5 });
+                setActivities(data.activities || []);
+            } catch {
+                setActivityError("Failed to load activity");
+            } finally {
+                setActivityLoading(false);
+            }
+        };
+        loadActivity();
     }, []);
 
     return (
@@ -123,16 +119,18 @@ const Dashboard = () => {
                         <div className="section-header">
                             <h2>Recent activity</h2>
                         </div>
+                        {activityLoading && <p>Loading activity...</p>}
+                        {activityError && <p>{activityError}</p>}
+                        {!activityLoading && !activityError && activities.length === 0 && (
+                            <p>No activity yet.</p>
+                        )}
                         <div className="activity-list">
-                            {activities.map((activity, index) => (
-                                <div className="activity-item" key={index}>
-                                    <div className="activity-dot"></div>
-                                    <div>
-                                        <h4>{activity.title}</h4>
-                                        <p>{activity.detail}</p>
-                                        <span>{activity.time}</span>
-                                    </div>
-                                </div>
+                            {activities.map((activity) => (
+                                <ActivityItem
+                                    key={activity._id}
+                                    activity={activity}
+                                    variant="panel"
+                                />
                             ))}
                         </div>
                     </aside>
