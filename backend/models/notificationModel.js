@@ -7,6 +7,8 @@ export const NOTIFICATION_TYPES = [
     "PR_COMMENTED",
     "PR_REVIEWED",
     "PR_MERGED",
+    "PR_CLOSED",
+    "PR_REOPENED",
     "MENTION",
     "REPOSITORY_STARRED",
     "RELEASE_PUBLISHED"
