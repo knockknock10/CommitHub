@@ -22,6 +22,8 @@ const commentSchema = new mongoose.Schema(
     }
 );
 
+commentSchema.index({ issue: 1, createdAt: 1 });
+
 const Comment = mongoose.model(
     "Comment",
     commentSchema
