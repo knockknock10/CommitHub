@@ -40,17 +40,14 @@ const IssueSchema = new Schema(
             ref: "User"
         },
         assignee: {
-            type: Schema.Types.ObjectId,
-            ref: "User",
-            default: null
+        type: Schema.Types.ObjectId,ref: "User",
+        default: null
         }
     },
     {
         timestamps: true
     }
 );
-
-IssueSchema.index({ repository: 1, status: 1 });
 
 const Issue = mongoose.model(
     "Issue",
