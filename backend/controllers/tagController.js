@@ -1,6 +1,7 @@
 import Tag from "../models/tagModel.js";
 import Release from "../models/releaseModel.js";
 import { authorizeRepository } from "../utils/repoAccess.js";
+import { createActivity } from "../utils/activityService.js";
 import { getRepoRoot } from "../utils/repoStorage.js";
 import {
     ensureVersionControl,
@@ -135,6 +136,14 @@ export const createTag = async (req, res) => {
             "creator",
             "userName email"
         );
+
+        await createActivity({
+            actor: req.user._id,
+            type: "TAG_CREATED",
+            repository: result.repository._id,
+            tag: tag._id,
+            metadata: { tagName: name }
+        });
 
         return res.status(201).json({
             ...serializeTag(populated),

@@ -1,5 +1,6 @@
 import { getRepoRoot } from "../utils/repoStorage.js";
 import { authorizeRepository } from "../utils/repoAccess.js";
+import { createActivity } from "../utils/activityService.js";
 import {
     MAX_COMMIT_MESSAGE_LENGTH,
     DEFAULT_HISTORY_LIMIT,
@@ -69,6 +70,14 @@ export const createCommit = async (req, res) => {
                 name: req.user.userName,
                 email: req.user.email
             }
+        });
+
+        await createActivity({
+            actor: req.user._id,
+            type: "COMMIT_CREATED",
+            repository: result.repository._id,
+            commitId: commit.id,
+            metadata: { commitMessage: commit.message }
         });
 
         return res.status(201).json(commit);

@@ -1,5 +1,6 @@
 import { getRepoRoot } from "../utils/repoStorage.js";
 import { authorizeRepository } from "../utils/repoAccess.js";
+import { createActivity } from "../utils/activityService.js";
 import {
     createBranch as performCreateBranch,
     checkoutBranch as performCheckoutBranch,
@@ -53,6 +54,13 @@ export const createBranch = async (req, res) => {
 
         await result.repository.updateOne({
             $addToSet: { branches: branch.name }
+        });
+
+        await createActivity({
+            actor: req.user._id,
+            type: "BRANCH_CREATED",
+            repository: result.repository._id,
+            metadata: { branchName: branch.name }
         });
 
         return res.status(201).json(branch);

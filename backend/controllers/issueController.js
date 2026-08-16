@@ -1,17 +1,19 @@
 import Issue from "../models/issueMode.js";
 import Repository from "../models/repoModel.js"
+import { authorizeRepository } from "../utils/repoAccess.js";
+import {
+    createNotification,
+    buildNotificationMessage
+} from "../utils/notificationService.js";
+import { createActivity } from "../utils/activityService.js";
 export const createIssue = async (req, res) => {
     try {
+        const result = await authorizeRepository(req, res, false);
 
-        const repository = await Repository.findOne({
-            _id: req.params.id,
-            owner: req.user._id
-        })
-        if (!repository) {
-            return res.status(404).json({
-                message: "Repository not found"
-            });
+        if (!result) {
+            return;
         }
+
         const { title, description, label } = req.body;
         if (!title || !description) {
             return res.status(400).json({
@@ -22,9 +24,30 @@ export const createIssue = async (req, res) => {
             title,
             description,
             label,
-            repository: repository._id,
+            repository: result.repository._id,
             author: req.user._id
         })
+
+        await createNotification({
+            recipient: result.repository.owner,
+            actor: req.user._id,
+            type: "ISSUE_CREATED",
+            repository: result.repository._id,
+            issue: issue._id,
+            message: buildNotificationMessage(
+                "ISSUE_CREATED",
+                { title }
+            )
+        });
+
+        await createActivity({
+            actor: req.user._id,
+            type: "ISSUE_CREATED",
+            repository: result.repository._id,
+            issue: issue._id,
+            metadata: { issueTitle: title }
+        });
+
         res.status(201).json({
             message: "Issue created !!",
             issue
