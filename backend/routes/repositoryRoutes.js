@@ -35,7 +35,8 @@ import {
     getPullRequests,
     mergePullRequest,
     reopenPullRequest,
-    submitReview
+    submitReview,
+    updatePullRequest
 } from "../controllers/pullRequestController.js";
 import {
     createTag,
@@ -105,7 +106,8 @@ router.route("/:id/pull-requests")
 .post(protect, createPullRequest);
 
 router.route("/:id/pull-requests/:number")
-.get(protect, getPullRequestById);
+.get(protect, getPullRequestById)
+.patch(protect, updatePullRequest);
 
 router.route("/:id/pull-requests/:number/close")
 .post(protect, closePullRequest);
