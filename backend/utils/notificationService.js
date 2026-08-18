@@ -18,6 +18,10 @@ const MESSAGE_TEMPLATES = {
         `reviewed your pull request: "${ctx.title}" (#${ctx.number})`,
     PR_MERGED: (ctx) =>
         `merged your pull request: "${ctx.title}" (#${ctx.number})`,
+    PR_CLOSED: (ctx) =>
+        `closed your pull request: "${ctx.title}" (#${ctx.number})`,
+    PR_REOPENED: (ctx) =>
+        `reopened your pull request: "${ctx.title}" (#${ctx.number})`,
     MENTION: (ctx) =>
         `mentioned you in a comment on: "${ctx.title}"`,
     REPOSITORY_STARRED: () =>
