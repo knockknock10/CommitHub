@@ -51,21 +51,48 @@ const canManagePullRequest = (pullRequest, user, isOwner) =>
     isOwner ||
     pullRequest.author.toString() === user._id.toString();
 
+const deriveReviewState = (reviews) => {
+    const states = reviews.map((review) => review.state);
+
+    if (states.includes("changes_requested")) {
+        return "changes_requested";
+    }
+
+    if (states.includes("approved")) {
+        return "approved";
+    }
+
+    if (states.length > 0) {
+        return "commented";
+    }
+
+    return "pending";
+};
+
 /* create pull request */
 export const createPullRequest = async (req, res) => {
+    const {
+        sourceBranch,
+        targetBranch,
+        title,
+        description
+    } = req.body || {};
+
+    const trimmedSource =
+        typeof sourceBranch === "string"
+            ? sourceBranch.trim()
+            : "";
+    const trimmedTarget =
+        typeof targetBranch === "string"
+            ? targetBranch.trim()
+            : "";
+
     try {
         const result = await authorizeRepository(req, res, false);
 
         if (!result) {
             return;
         }
-
-        const {
-            sourceBranch,
-            targetBranch,
-            title,
-            description
-        } = req.body || {};
 
         const trimmedTitle =
             typeof title === "string" ? title.trim() : "";
@@ -81,15 +108,6 @@ export const createPullRequest = async (req, res) => {
                 message: `Pull request title must be ${TITLE_MAX_LENGTH} characters or fewer`
             });
         }
-
-        const trimmedSource =
-            typeof sourceBranch === "string"
-                ? sourceBranch.trim()
-                : "";
-        const trimmedTarget =
-            typeof targetBranch === "string"
-                ? targetBranch.trim()
-                : "";
 
         if (trimmedSource === "" || trimmedTarget === "") {
             return res.status(400).json({
@@ -131,6 +149,19 @@ export const createPullRequest = async (req, res) => {
         if (targetCommitId === null) {
             return res.status(400).json({
                 message: `Branch "${trimmedTarget}" has no commits`
+            });
+        }
+
+        const duplicate = await PullRequest.findOne({
+            repository: result.repository._id,
+            sourceBranch: trimmedSource,
+            targetBranch: trimmedTarget,
+            status: "open"
+        });
+
+        if (duplicate) {
+            return res.status(400).json({
+                message: `An open pull request already exists for "${trimmedSource}" into "${trimmedTarget}" (#${duplicate.number})`
             });
         }
 
@@ -182,6 +213,12 @@ export const createPullRequest = async (req, res) => {
 
         return res.status(201).json(populated);
     } catch (error) {
+        if (error.code === 11000) {
+            return res.status(400).json({
+                message: `An open pull request already exists for "${trimmedSource}" into "${trimmedTarget}"`
+            });
+        }
+
         if (error.code === "INVALID_BRANCH_NAME") {
             return res.status(400).json({
                 message: "Invalid branch name"
@@ -241,8 +278,30 @@ export const getPullRequests = async (req, res) => {
             PullRequest.countDocuments(query)
         ]);
 
+        const reviewStates = await PullRequest.find({
+            _id: { $in: pullRequests.map((pr) => pr._id) }
+        }).select("reviews.state");
+
+        const reviewStateByPullRequest = Object.fromEntries(
+            reviewStates.map((pr) => [
+                pr._id.toString(),
+                deriveReviewState(pr.reviews)
+            ])
+        );
+
+        const withReviewState = pullRequests.map((pullRequest) => {
+            const doc = pullRequest.toObject();
+
+            doc.reviewState =
+                reviewStateByPullRequest[
+                    pullRequest._id.toString()
+                ] || "pending";
+
+            return doc;
+        });
+
         return res.status(200).json({
-            pullRequests,
+            pullRequests: withReviewState,
             total,
             page,
             limit,
@@ -333,6 +392,7 @@ export const getPullRequestById = async (req, res) => {
 
         return res.status(200).json({
             ...pullRequest.toObject(),
+            reviewState: deriveReviewState(pullRequest.reviews),
             commits,
             diff,
             sourceCommitId,
@@ -340,6 +400,86 @@ export const getPullRequestById = async (req, res) => {
             sourceBranchExists: sourceCommitId !== null,
             targetBranchExists: targetCommitId !== null
         });
+    } catch (error) {
+        return res.status(500).json({
+            message: "Server error"
+        });
+    }
+};
+
+/* update pull request */
+export const updatePullRequest = async (req, res) => {
+    try {
+        const result = await authorizeRepository(req, res, false);
+
+        if (!result) {
+            return;
+        }
+
+        const number = parseNumber(req.params.number);
+
+        if (number === 0) {
+            return res.status(400).json({
+                message: "Invalid pull request number"
+            });
+        }
+
+        const pullRequest = await findPullRequest(
+            result.repository._id,
+            number
+        );
+
+        if (!pullRequest) {
+            return res.status(404).json({
+                message: "Pull request not found"
+            });
+        }
+
+        if (!canManagePullRequest(
+            pullRequest,
+            req.user,
+            result.isOwner
+        )) {
+            return res.status(403).json({
+                message: "You do not have access to this pull request"
+            });
+        }
+
+        const { title, description } = req.body || {};
+
+        const trimmedTitle =
+            typeof title === "string" ? title.trim() : null;
+
+        if (trimmedTitle !== null && trimmedTitle === "") {
+            return res.status(400).json({
+                message: "Pull request title cannot be empty"
+            });
+        }
+
+        if (
+            trimmedTitle !== null &&
+            trimmedTitle.length > TITLE_MAX_LENGTH
+        ) {
+            return res.status(400).json({
+                message: `Pull request title must be ${TITLE_MAX_LENGTH} characters or fewer`
+            });
+        }
+
+        if (trimmedTitle !== null) {
+            pullRequest.title = trimmedTitle;
+        }
+
+        if (typeof description === "string") {
+            pullRequest.description = description.trim();
+        }
+
+        await pullRequest.save();
+
+        const populated = await PullRequest.findById(
+            pullRequest._id
+        ).populate("author", "userName email");
+
+        return res.status(200).json(populated);
     } catch (error) {
         return res.status(500).json({
             message: "Server error"
@@ -394,6 +534,32 @@ export const closePullRequest = async (req, res) => {
         pullRequest.status = "closed";
 
         await pullRequest.save();
+
+        await createNotification({
+            recipient: pullRequest.author,
+            actor: req.user._id,
+            type: "PR_CLOSED",
+            repository: result.repository._id,
+            pullRequest: pullRequest._id,
+            message: buildNotificationMessage(
+                "PR_CLOSED",
+                {
+                    title: pullRequest.title,
+                    number: pullRequest.number
+                }
+            )
+        });
+
+        await createActivity({
+            actor: req.user._id,
+            type: "PR_CLOSED",
+            repository: result.repository._id,
+            pullRequest: pullRequest._id,
+            metadata: {
+                pullRequestNumber: pullRequest.number,
+                pullRequestTitle: pullRequest.title
+            }
+        });
 
         return res.status(200).json({
             message: "Pull request closed",
@@ -450,15 +616,61 @@ export const reopenPullRequest = async (req, res) => {
             });
         }
 
+        const conflicting = await PullRequest.findOne({
+            repository: result.repository._id,
+            sourceBranch: pullRequest.sourceBranch,
+            targetBranch: pullRequest.targetBranch,
+            status: "open",
+            _id: { $ne: pullRequest._id }
+        });
+
+        if (conflicting) {
+            return res.status(400).json({
+                message: `An open pull request already exists for "${pullRequest.sourceBranch}" into "${pullRequest.targetBranch}" (#${conflicting.number})`
+            });
+        }
+
         pullRequest.status = "open";
 
         await pullRequest.save();
+
+        await createNotification({
+            recipient: pullRequest.author,
+            actor: req.user._id,
+            type: "PR_REOPENED",
+            repository: result.repository._id,
+            pullRequest: pullRequest._id,
+            message: buildNotificationMessage(
+                "PR_REOPENED",
+                {
+                    title: pullRequest.title,
+                    number: pullRequest.number
+                }
+            )
+        });
+
+        await createActivity({
+            actor: req.user._id,
+            type: "PR_REOPENED",
+            repository: result.repository._id,
+            pullRequest: pullRequest._id,
+            metadata: {
+                pullRequestNumber: pullRequest.number,
+                pullRequestTitle: pullRequest.title
+            }
+        });
 
         return res.status(200).json({
             message: "Pull request reopened",
             number: pullRequest.number
         });
     } catch (error) {
+        if (error.code === 11000) {
+            return res.status(400).json({
+                message: "An open pull request already exists for this branch pair"
+            });
+        }
+
         return res.status(500).json({
             message: "Server error"
         });
