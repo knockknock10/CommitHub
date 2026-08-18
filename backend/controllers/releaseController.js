@@ -15,6 +15,7 @@ import {
     createNotification,
     buildNotificationMessage
 } from "../utils/notificationService.js";
+import { createActivity } from "../utils/activityService.js";
 
 const TITLE_MAX_LENGTH = 200;
 const RELEASE_STATUSES = ["draft", "published"];
@@ -455,6 +456,17 @@ export const updateRelease = async (req, res) => {
                     )
                 });
             }
+
+            await createActivity({
+                actor: req.user._id,
+                type: "RELEASE_PUBLISHED",
+                repository: result.repository._id,
+                release: release._id,
+                metadata: {
+                    tagName: release.tagName,
+                    releaseTitle: release.title
+                }
+            });
         }
 
         const populated = await Release.findById(release._id).populate(
