@@ -18,6 +18,8 @@ import express from "express";
 import User from "../models/userModel.js";
 import Repository from "../models/repoModel.js";
 import PullRequest from "../models/pullRequestModel.js";
+import Activity from "../models/activityModel.js";
+import Notification from "../models/notificationModel.js";
 import repositoryRoutes from "../routes/repositoryRoutes.js";
 import { getRepoRoot } from "../utils/repoStorage.js";
 import {
@@ -223,6 +225,14 @@ const setupFastForwardRepo = async () => {
     return repo;
 };
 
+const addBranchWithCommit = async (repo, branchName) => {
+    await createBranchRequest(repo, { name: branchName }, ownerToken);
+    await checkoutRequest(repo, { name: branchName }, ownerToken);
+    await writeRepoFile(repo, `${branchName}.txt`, branchName);
+    await commitHeadCommit(repo, `${branchName} work`);
+    await checkoutRequest(repo, { name: "main" }, ownerToken);
+};
+
 const openPullRequest = async (
     repo,
     {
@@ -250,7 +260,9 @@ beforeEach(async () => {
     await Promise.all([
         User.deleteMany({}),
         Repository.deleteMany({}),
-        PullRequest.deleteMany({})
+        PullRequest.deleteMany({}),
+        Activity.deleteMany({}),
+        Notification.deleteMany({})
     ]);
 
     await fs.promises.rm(storageRoot, { recursive: true, force: true });
@@ -274,7 +286,9 @@ after(async () => {
     await Promise.all([
         User.deleteMany({}),
         Repository.deleteMany({}),
-        PullRequest.deleteMany({})
+        PullRequest.deleteMany({}),
+        Activity.deleteMany({}),
+        Notification.deleteMany({})
     ]);
 
     await fs.promises.rm(storageRoot, { recursive: true, force: true });
@@ -424,9 +438,13 @@ describe("pull request creation", () => {
 
     it("numbers pull requests sequentially within a repository", async () => {
         const repo = await setupFastForwardRepo();
+        await addBranchWithCommit(repo, "dev2");
 
         const first = await openPullRequest(repo, { title: "one" });
-        const second = await openPullRequest(repo, { title: "two" });
+        const second = await openPullRequest(repo, {
+            source: "dev2",
+            title: "two"
+        });
 
         assert.equal((await first.json()).number, 1);
         assert.equal((await second.json()).number, 2);
@@ -444,21 +462,26 @@ describe("pull request creation", () => {
 
     it("does not burn a number when a create request is rejected", async () => {
         const repo = await setupFastForwardRepo();
+        await addBranchWithCommit(repo, "dev2");
 
         await openPullRequest(repo, { title: "one" });
         await openPullRequest(repo, { source: "nope", title: "rejected" });
 
-        const response = await openPullRequest(repo, { title: "three" });
+        const response = await openPullRequest(repo, {
+            source: "dev2",
+            title: "three"
+        });
 
         assert.equal((await response.json()).number, 2);
     });
 
     it("allocates distinct numbers under concurrent creation", async () => {
         const repo = await setupFastForwardRepo();
+        await addBranchWithCommit(repo, "dev2");
 
         const [a, b] = await Promise.all([
             openPullRequest(repo, { title: "a" }),
-            openPullRequest(repo, { title: "b" })
+            openPullRequest(repo, { source: "dev2", title: "b" })
         ]);
 
         const numbers = [
@@ -467,6 +490,25 @@ describe("pull request creation", () => {
         ].sort();
 
         assert.deepEqual(numbers, [1, 2]);
+    });
+
+    it("allows only one open pull request under concurrent duplicate creation", async () => {
+        const repo = await setupFastForwardRepo();
+
+        const [a, b] = await Promise.all([
+            openPullRequest(repo, { title: "a" }),
+            openPullRequest(repo, { title: "b" })
+        ]);
+
+        const statuses = [a.status, b.status].sort();
+
+        assert.deepEqual(statuses, [201, 400]);
+
+        const stored = await PullRequest.find({
+            repository: repo._id
+        });
+
+        assert.equal(stored.length, 1);
     });
 
     it("allows an authenticated user to open a pull request on a public repository", async () => {
@@ -517,8 +559,9 @@ describe("pull request listing", () => {
 
     it("lists pull requests newest first", async () => {
         const repo = await setupFastForwardRepo();
+        await addBranchWithCommit(repo, "dev2");
         await openPullRequest(repo, { title: "one" });
-        await openPullRequest(repo, { title: "two" });
+        await openPullRequest(repo, { source: "dev2", title: "two" });
 
         const response = await prListRequest(repo, "", ownerToken);
         const body = await response.json();
@@ -531,8 +574,12 @@ describe("pull request listing", () => {
 
     it("filters by status", async () => {
         const repo = await setupFastForwardRepo();
+        await addBranchWithCommit(repo, "dev2");
         await openPullRequest(repo, { title: "one" });
-        const second = await openPullRequest(repo, { title: "two" });
+        const second = await openPullRequest(repo, {
+            source: "dev2",
+            title: "two"
+        });
         await prCloseRequest(repo, (await second.json()).number, ownerToken);
 
         const open = await prListRequest(repo, "status=open", ownerToken);
@@ -561,7 +608,16 @@ describe("pull request listing", () => {
         const repo = await setupFastForwardRepo();
 
         for (let index = 1; index <= 3; index += 1) {
-            await openPullRequest(repo, { title: `pr ${index}` });
+            const branch = `dev-${index}`;
+            await createBranchRequest(repo, { name: branch }, ownerToken);
+            await checkoutRequest(repo, { name: branch }, ownerToken);
+            await writeRepoFile(repo, `${branch}.txt`, branch);
+            await commitHeadCommit(repo, `${branch} work`);
+            await checkoutRequest(repo, { name: "main" }, ownerToken);
+            await openPullRequest(repo, {
+                source: branch,
+                title: `pr ${index}`
+            });
         }
 
         const page = await prListRequest(repo, "page=2&limit=2", ownerToken);
@@ -1382,6 +1438,466 @@ describe("merge service edge cases", () => {
         assert.equal(
             await readRepoFile(repo, "dirty.txt"),
             "uncommitted"
+        );
+    });
+});
+
+describe("pull request duplicate prevention", () => {
+    it("rejects a second open pull request for the same branch pair", async () => {
+        const repo = await setupFastForwardRepo();
+        await openPullRequest(repo);
+
+        const response = await openPullRequest(repo);
+
+        assert.equal(response.status, 400);
+        assert.match(
+            (await response.json()).message,
+            /already exists/
+        );
+    });
+
+    it("allows a new pull request for the same branch pair after the first is merged", async () => {
+        const repo = await setupFastForwardRepo();
+        const first = await openPullRequest(repo);
+        const number = (await first.json()).number;
+
+        await prMergeRequest(repo, number, ownerToken);
+
+        const second = await openPullRequest(repo);
+
+        assert.equal(second.status, 201);
+    });
+
+    it("allows a new pull request for the same branch pair after the first is closed", async () => {
+        const repo = await setupFastForwardRepo();
+        const first = await openPullRequest(repo);
+        const number = (await first.json()).number;
+
+        await prCloseRequest(repo, number, ownerToken);
+
+        const second = await openPullRequest(repo);
+
+        assert.equal(second.status, 201);
+    });
+
+    it("does not burn a number when a duplicate is rejected", async () => {
+        const repo = await setupFastForwardRepo();
+        const first = await openPullRequest(repo);
+        const firstNumber = (await first.json()).number;
+
+        await openPullRequest(repo);
+
+        const list = await prListRequest(repo, "", ownerToken);
+        const body = await list.json();
+
+        assert.equal(body.total, 1);
+        assert.equal(body.pullRequests[0].number, firstNumber);
+    });
+
+    it("treats a reopened pull request as a duplicate while it is open", async () => {
+        const repo = await setupFastForwardRepo();
+        const first = await openPullRequest(repo);
+        const number = (await first.json()).number;
+
+        await prCloseRequest(repo, number, ownerToken);
+        await prReopenRequest(repo, number, ownerToken);
+
+        const second = await openPullRequest(repo);
+
+        assert.equal(second.status, 400);
+    });
+
+    it("rejects reopening a closed pull request when another open PR holds the branch pair", async () => {
+        const repo = await setupFastForwardRepo();
+        const first = await openPullRequest(repo);
+        const firstNumber = (await first.json()).number;
+
+        await prCloseRequest(repo, firstNumber, ownerToken);
+
+        const second = await openPullRequest(repo);
+
+        assert.equal(second.status, 201);
+
+        const response = await prReopenRequest(
+            repo,
+            firstNumber,
+            ownerToken
+        );
+
+        assert.equal(response.status, 400);
+        assert.match(
+            (await response.json()).message,
+            /already exists/
+        );
+    });
+});
+
+describe("pull request update", () => {
+    it("updates the title and description as the author", async () => {
+        const repo = await setupFastForwardRepo();
+        const created = await openPullRequest(repo);
+        const number = (await created.json()).number;
+
+        const response = await jsonRequest(
+            `/api/repositories/${repo._id}/pull-requests/${number}`,
+            "PATCH",
+            { title: "Renamed", description: "new desc" },
+            ownerToken
+        );
+
+        assert.equal(response.status, 200);
+        const body = await response.json();
+        assert.equal(body.title, "Renamed");
+        assert.equal(body.description, "new desc");
+    });
+
+    it("updates a pull request as the repository owner", async () => {
+        const repo = await setupFastForwardRepo();
+        const created = await openPullRequest(repo, {
+            token: otherToken
+        });
+        const number = (await created.json()).number;
+
+        const response = await jsonRequest(
+            `/api/repositories/${repo._id}/pull-requests/${number}`,
+            "PATCH",
+            { title: "Owner edit" },
+            ownerToken
+        );
+
+        assert.equal(response.status, 200);
+        assert.equal((await response.json()).title, "Owner edit");
+    });
+
+    it("rejects updates from a non-author non-owner", async () => {
+        const intruder = await User.create({
+            userName: "intruder",
+            email: "intruder@test.com",
+            password: await bcrypt.hash("password123", 10)
+        });
+        const intruderToken = tokenFor(intruder._id);
+
+        const repo = await setupFastForwardRepo();
+        const created = await openPullRequest(repo, {
+            token: otherToken
+        });
+        const number = (await created.json()).number;
+
+        const response = await jsonRequest(
+            `/api/repositories/${repo._id}/pull-requests/${number}`,
+            "PATCH",
+            { title: "Hijacked" },
+            intruderToken
+        );
+
+        assert.equal(response.status, 403);
+    });
+});
+
+describe("pull request review state", () => {
+    it("is pending when there are no reviews", async () => {
+        const repo = await setupFastForwardRepo();
+        const created = await openPullRequest(repo);
+        const number = (await created.json()).number;
+
+        const response = await prDetailRequest(
+            repo,
+            number,
+            ownerToken
+        );
+
+        assert.equal((await response.json()).reviewState, "pending");
+    });
+
+    it("becomes approved after an approved review", async () => {
+        const repo = await setupFastForwardRepo();
+        const created = await openPullRequest(repo);
+        const number = (await created.json()).number;
+
+        await prReviewRequest(
+            repo,
+            number,
+            { state: "approved", comment: "looks good" },
+            otherToken
+        );
+
+        const response = await prDetailRequest(
+            repo,
+            number,
+            ownerToken
+        );
+
+        assert.equal((await response.json()).reviewState, "approved");
+    });
+
+    it("changes_requested wins over a later approval", async () => {
+        const repo = await setupFastForwardRepo();
+        const created = await openPullRequest(repo);
+        const number = (await created.json()).number;
+
+        await prReviewRequest(
+            repo,
+            number,
+            { state: "changes_requested", comment: "fix x" },
+            otherToken
+        );
+        await prReviewRequest(
+            repo,
+            number,
+            { state: "approved", comment: "ok now" },
+            otherToken
+        );
+
+        const response = await prDetailRequest(
+            repo,
+            number,
+            ownerToken
+        );
+
+        assert.equal(
+            (await response.json()).reviewState,
+            "changes_requested"
+        );
+    });
+
+    it("exposes reviewState in the lean listing", async () => {
+        const repo = await setupFastForwardRepo();
+        const created = await openPullRequest(repo);
+        const number = (await created.json()).number;
+
+        await prReviewRequest(
+            repo,
+            number,
+            { state: "approved", comment: "nice" },
+            otherToken
+        );
+
+        const response = await prListRequest(repo, "", ownerToken);
+        const body = await response.json();
+
+        assert.equal(body.pullRequests[0].reviewState, "approved");
+        assert.equal(
+            body.pullRequests[0].hasOwnProperty("reviews"),
+            false
+        );
+        assert.equal(
+            body.pullRequests[0].hasOwnProperty("comments"),
+            false
+        );
+    });
+});
+
+describe("pull request close and reopen activity", () => {
+    it("records PR_CLOSED activity when a pull request is closed", async () => {
+        const repo = await setupFastForwardRepo();
+        const created = await openPullRequest(repo, {
+            token: otherToken
+        });
+        const number = (await created.json()).number;
+
+        await prCloseRequest(repo, number, ownerToken);
+
+        const activities = await Activity.find({
+            type: "PR_CLOSED"
+        });
+
+        assert.equal(activities.length, 1);
+        assert.equal(
+            activities[0].actor.toString(),
+            owner._id.toString()
+        );
+        assert.equal(
+            activities[0].repository.toString(),
+            repo._id.toString()
+        );
+        assert.equal(
+            activities[0].metadata.pullRequestNumber,
+            number
+        );
+    });
+
+    it("notifies the author when the owner closes their pull request", async () => {
+        const repo = await setupFastForwardRepo();
+        const created = await openPullRequest(repo, {
+            token: otherToken
+        });
+        const number = (await created.json()).number;
+
+        await prCloseRequest(repo, number, ownerToken);
+
+        const notifications = await Notification.find({
+            type: "PR_CLOSED"
+        });
+
+        assert.equal(notifications.length, 1);
+        assert.equal(
+            notifications[0].recipient.toString(),
+            other._id.toString()
+        );
+        assert.match(
+            notifications[0].message,
+            new RegExp(`#${number}`)
+        );
+    });
+
+    it("does not notify the author when they close their own pull request", async () => {
+        const repo = await setupFastForwardRepo();
+        const created = await openPullRequest(repo);
+        const number = (await created.json()).number;
+
+        await prCloseRequest(repo, number, ownerToken);
+
+        const notifications = await Notification.find({
+            type: "PR_CLOSED"
+        });
+
+        assert.equal(notifications.length, 0);
+    });
+
+    it("records PR_REOPENED activity when a pull request is reopened", async () => {
+        const repo = await setupFastForwardRepo();
+        const created = await openPullRequest(repo);
+        const number = (await created.json()).number;
+
+        await prCloseRequest(repo, number, ownerToken);
+        await prReopenRequest(repo, number, ownerToken);
+
+        const activities = await Activity.find({
+            type: "PR_REOPENED"
+        });
+
+        assert.equal(activities.length, 1);
+        assert.equal(
+            activities[0].metadata.pullRequestNumber,
+            number
+        );
+    });
+});
+
+describe("pull request activity and notification generation", () => {
+    it("records PR_CREATED activity and notifies the owner when a contributor opens a PR", async () => {
+        const repo = await setupFastForwardRepo();
+
+        await openPullRequest(repo, { token: otherToken });
+
+        const activities = await Activity.find({
+            type: "PR_CREATED"
+        });
+
+        assert.equal(activities.length, 1);
+        assert.equal(
+            activities[0].actor.toString(),
+            other._id.toString()
+        );
+        assert.equal(
+            activities[0].repository.toString(),
+            repo._id.toString()
+        );
+        assert.equal(
+            activities[0].metadata.pullRequestNumber,
+            1
+        );
+
+        const notifications = await Notification.find({
+            type: "PR_CREATED"
+        });
+
+        assert.equal(notifications.length, 1);
+        assert.equal(
+            notifications[0].recipient.toString(),
+            owner._id.toString()
+        );
+        assert.match(notifications[0].message, /#1/);
+    });
+
+    it("does not notify the owner when they open their own pull request", async () => {
+        const repo = await setupFastForwardRepo();
+
+        await openPullRequest(repo);
+
+        const activities = await Activity.find({
+            type: "PR_CREATED"
+        });
+
+        assert.equal(activities.length, 1);
+
+        const notifications = await Notification.find({
+            type: "PR_CREATED"
+        });
+
+        assert.equal(notifications.length, 0);
+    });
+
+    it("records PR_REVIEWED activity and notifies the author when reviewed", async () => {
+        const repo = await setupFastForwardRepo();
+        const created = await openPullRequest(repo);
+        const number = (await created.json()).number;
+
+        await prReviewRequest(
+            repo,
+            number,
+            { state: "approved", comment: "looks good" },
+            otherToken
+        );
+
+        const activities = await Activity.find({
+            type: "PR_REVIEWED"
+        });
+
+        assert.equal(activities.length, 1);
+        assert.equal(
+            activities[0].actor.toString(),
+            other._id.toString()
+        );
+        assert.equal(activities[0].metadata.reviewState, "approved");
+
+        const notifications = await Notification.find({
+            type: "PR_REVIEWED"
+        });
+
+        assert.equal(notifications.length, 1);
+        assert.equal(
+            notifications[0].recipient.toString(),
+            owner._id.toString()
+        );
+        assert.match(notifications[0].message, /#1/);
+    });
+
+    it("records PR_MERGED activity and notifies the author when merged", async () => {
+        const repo = await setupFastForwardRepo();
+        const created = await openPullRequest(repo, {
+            token: otherToken
+        });
+        const number = (await created.json()).number;
+
+        await prMergeRequest(repo, number, ownerToken);
+
+        const activities = await Activity.find({
+            type: "PR_MERGED"
+        });
+
+        assert.equal(activities.length, 1);
+        assert.equal(
+            activities[0].actor.toString(),
+            owner._id.toString()
+        );
+        assert.equal(
+            activities[0].metadata.pullRequestNumber,
+            number
+        );
+
+        const notifications = await Notification.find({
+            type: "PR_MERGED"
+        });
+
+        assert.equal(notifications.length, 1);
+        assert.equal(
+            notifications[0].recipient.toString(),
+            other._id.toString()
+        );
+        assert.match(
+            notifications[0].message,
+            new RegExp(`#${number}`)
         );
     });
 });
