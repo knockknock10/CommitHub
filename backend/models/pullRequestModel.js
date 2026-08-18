@@ -114,6 +114,22 @@ PullRequestSchema.index(
     { unique: true }
 );
 
+PullRequestSchema.index(
+    { repository: 1, status: 1, number: -1 }
+);
+
+PullRequestSchema.index(
+    {
+        repository: 1,
+        sourceBranch: 1,
+        targetBranch: 1
+    },
+    {
+        unique: true,
+        partialFilterExpression: { status: "open" }
+    }
+);
+
 const PullRequest = mongoose.model(
     "PullRequest",
     PullRequestSchema
