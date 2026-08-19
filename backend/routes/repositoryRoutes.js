@@ -14,7 +14,15 @@ import {
     starRepository,
     unstarRepository,
     updateRepository,
-    updateRepositoryFile
+    updateRepositoryFile,
+    getBranchTree,
+    getBranchBlob,
+    getRawFile,
+    getFileCommitHistory,
+    createBranchFile,
+    editBranchFile,
+    deleteBranchFile,
+    compareBranches
 } from "../controllers/repoController.js";
 import {
     createCommit,
@@ -38,6 +46,7 @@ import {
     submitReview,
     updatePullRequest
 } from "../controllers/pullRequestController.js";
+import { getMergeAnalysis } from "../controllers/mergeAnalysisController.js";
 import {
     createTag,
     deleteTag,
@@ -78,6 +87,27 @@ router.route("/:id/directory")
 .post(protect, createRepositoryDirectory)
 .delete(protect, deleteRepositoryDirectory);
 
+router.route("/:id/branch-tree")
+.get(protect, getBranchTree);
+
+router.route("/:id/branch-blob")
+.get(protect, getBranchBlob);
+
+router.route("/:id/raw")
+.get(protect, getRawFile);
+
+router.route("/:id/file-history")
+.get(protect, getFileCommitHistory);
+
+router.route("/:id/branch-file/create")
+.post(protect, createBranchFile);
+
+router.route("/:id/branch-file/edit")
+.put(protect, editBranchFile);
+
+router.route("/:id/branch-file/remove")
+.delete(protect, deleteBranchFile);
+
 router.route("/:id/star")
 .patch(protect, starRepository);
 
@@ -101,6 +131,9 @@ router.route("/:id/branches")
 router.route("/:id/branches/checkout")
 .post(protect, checkoutBranch);
 
+router.route("/:id/compare")
+.get(protect, compareBranches);
+
 router.route("/:id/pull-requests")
 .get(protect, getPullRequests)
 .post(protect, createPullRequest);
@@ -123,6 +156,9 @@ router.route("/:id/pull-requests/:number/comments")
 
 router.route("/:id/pull-requests/:number/merge")
 .post(protect, mergePullRequest);
+
+router.route("/:id/merge-analysis")
+.get(protect, getMergeAnalysis);
 
 router.route("/:id/tags")
 .get(protect, getTags)
