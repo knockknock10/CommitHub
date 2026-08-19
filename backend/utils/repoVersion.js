@@ -5,6 +5,7 @@ import crypto from "crypto";
 const MAX_COMMIT_MESSAGE_LENGTH = 200;
 const DEFAULT_HISTORY_LIMIT = 50;
 const MAX_HISTORY_LIMIT = 100;
+const MAX_FILE_SIZE = 1024 * 1024;
 const COMMIT_ID_PATTERN = /^[0-9a-f]{4,40}$/i;
 const BRANCH_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._/-]{0,62}$/;
 const TAG_NAME_PATTERN = /^[a-zA-Z0-9][a-zA-Z0-9._-]{0,99}$/;
@@ -221,14 +222,22 @@ const getWorkingTreeChanges = async (repoRoot) => {
     return changes;
 };
 
-const generateCommitId = (author, message, timestamp, parent, changes) =>
+const generateCommitId = (
+    author,
+    message,
+    timestamp,
+    parent,
+    changes,
+    parents
+) =>
     crypto.createHash("sha1")
         .update(JSON.stringify({
             author,
             message,
             timestamp,
             parent,
-            changes
+            changes,
+            parents: parents || undefined
         }))
         .digest("hex")
         .slice(0, 12);
@@ -280,7 +289,124 @@ const createCommit = async (repoRoot, { message, author }) => {
             },
             timestamp,
             parent: headCommitId,
+            parents: headCommitId ? [headCommitId] : [],
             files: changes
+        };
+
+        await fs.promises.writeFile(
+            path.join(commitDir, "meta.json"),
+            JSON.stringify(metadata, null, 2)
+        );
+
+        const branch = await getCurrentBranch(vcRoot);
+
+        await fs.promises.writeFile(
+            getBranchRefPath(vcRoot, branch),
+            commitId
+        );
+
+        return metadata;
+    } catch (error) {
+        await fs.promises.rm(commitDir, { recursive: true, force: true });
+        throw error;
+    }
+};
+
+const createMergeCommit = async (
+    repoRoot,
+    { message, author, parents }
+) => {
+    if (!Array.isArray(parents) || parents.length < 2) {
+        const error = new Error(
+            "Merge commit requires at least two parents"
+        );
+        error.code = "INVALID_PARENTS";
+        throw error;
+    }
+
+    for (const parentId of parents) {
+        if (!isValidCommitId(parentId)) {
+            const error = new Error("Invalid parent commit ID");
+            error.code = "INVALID_COMMIT_ID";
+            throw error;
+        }
+    }
+
+    const vcRoot = await ensureVersionControl(repoRoot);
+    const timestamp = Date.now();
+
+    const parentMeta = await Promise.all(
+        parents.map((p) => readMeta(vcRoot, p))
+    );
+
+    for (let i = 0; i < parentMeta.length; i += 1) {
+        if (!parentMeta[i]) {
+            const error = new Error(
+                `Parent commit "${parents[i]}" not found`
+            );
+            error.code = "COMMIT_NOT_FOUND";
+            throw error;
+        }
+    }
+
+    const sourceSnapshot = await getSnapshot(vcRoot, parents[1]);
+    const sourceFiles = new Set(sourceSnapshot.files);
+
+    const mergedFiles = new Set();
+
+    for (const file of sourceSnapshot.files) {
+        mergedFiles.add(file);
+    }
+
+    const baseSnapshot = await getSnapshot(vcRoot, parents[0]);
+
+    for (const file of baseSnapshot.files) {
+        if (!sourceFiles.has(file)) {
+            mergedFiles.add(file);
+        }
+    }
+
+    const commitId = generateCommitId(
+        author,
+        message,
+        timestamp,
+        parents[0],
+        [],
+        parents
+    );
+
+    const commitDir = path.join(vcRoot, "commits", commitId);
+    const snapshotDir = path.join(commitDir, "snapshot");
+
+    await fs.promises.mkdir(snapshotDir, { recursive: true });
+
+    try {
+        for (const file of mergedFiles) {
+            const sourcePath = sourceFiles.has(file)
+                ? path.join(sourceSnapshot.root, file)
+                : path.join(baseSnapshot.root, file);
+
+            const targetPath = path.join(snapshotDir, file);
+
+            await fs.promises.mkdir(
+                path.dirname(targetPath),
+                { recursive: true }
+            );
+            await fs.promises.copyFile(sourcePath, targetPath);
+        }
+
+        const metadata = {
+            id: commitId,
+            message,
+            author: {
+                name: author.name,
+                email: author.email
+            },
+            timestamp,
+            parent: parents[0],
+            parents,
+            merge: true,
+            files: []
         };
 
         await fs.promises.writeFile(
@@ -352,6 +478,8 @@ const getCommit = async (repoRoot, commitId) => {
         author: metadata.author,
         timestamp: metadata.timestamp,
         parent: metadata.parent,
+        parents: metadata.parents || (metadata.parent ? [metadata.parent] : []),
+        merge: metadata.merge || false,
         files: metadata.files || []
     };
 };
@@ -390,12 +518,17 @@ const getCommitHistory = async (
                 message: metadata.message,
                 author: metadata.author,
                 timestamp: metadata.timestamp,
-                parent: metadata.parent
+                parent: metadata.parent,
+                parents: metadata.parents || (metadata.parent ? [metadata.parent] : []),
+                merge: metadata.merge || false
             });
         }
 
         index += 1;
-        current = metadata.parent;
+        const allParents = metadata.parents && metadata.parents.length > 0
+            ? metadata.parents
+            : (metadata.parent ? [metadata.parent] : []);
+        current = allParents[0] || null;
     }
 
     return commits;
@@ -842,16 +975,18 @@ const isAncestorCommit = async (vcRoot, ancestorId, commitId) => {
         return false;
     }
 
-    let current = commitId;
+    const queue = [commitId];
     const visited = new Set();
 
-    while (current) {
+    while (queue.length > 0) {
+        const current = queue.shift();
+
         if (current === ancestorId) {
             return true;
         }
 
         if (visited.has(current)) {
-            return false;
+            continue;
         }
 
         visited.add(current);
@@ -859,10 +994,18 @@ const isAncestorCommit = async (vcRoot, ancestorId, commitId) => {
         const metadata = await readMeta(vcRoot, current);
 
         if (!metadata) {
-            return false;
+            continue;
         }
 
-        current = metadata.parent || null;
+        const allParents = metadata.parents && metadata.parents.length > 0
+            ? metadata.parents
+            : (metadata.parent ? [metadata.parent] : []);
+
+        for (const p of allParents) {
+            if (!visited.has(p)) {
+                queue.push(p);
+            }
+        }
     }
 
     return false;
@@ -873,35 +1016,64 @@ const getMergeBase = async (vcRoot, aCommitId, bCommitId) => {
         return null;
     }
 
-    const aAncestors = new Set();
-    let current = aCommitId;
-
-    while (current) {
-        aAncestors.add(current);
-
-        const metadata = await readMeta(vcRoot, current);
+    const getParents = async (commitId) => {
+        const metadata = await readMeta(vcRoot, commitId);
 
         if (!metadata) {
-            break;
+            return [];
         }
 
-        current = metadata.parent || null;
+        if (metadata.parents && metadata.parents.length > 0) {
+            return metadata.parents;
+        }
+
+        return metadata.parent ? [metadata.parent] : [];
+    };
+
+    const aAncestors = new Set();
+    const aQueue = [aCommitId];
+
+    while (aQueue.length > 0) {
+        const current = aQueue.shift();
+
+        if (aAncestors.has(current)) {
+            continue;
+        }
+
+        aAncestors.add(current);
+
+        const parents = await getParents(current);
+
+        for (const p of parents) {
+            if (!aAncestors.has(p)) {
+                aQueue.push(p);
+            }
+        }
     }
 
-    current = bCommitId;
+    const bQueue = [bCommitId];
+    const bVisited = new Set();
 
-    while (current) {
+    while (bQueue.length > 0) {
+        const current = bQueue.shift();
+
+        if (bVisited.has(current)) {
+            continue;
+        }
+
         if (aAncestors.has(current)) {
             return current;
         }
 
-        const metadata = await readMeta(vcRoot, current);
+        bVisited.add(current);
 
-        if (!metadata) {
-            break;
+        const parents = await getParents(current);
+
+        for (const p of parents) {
+            if (!bVisited.has(p)) {
+                bQueue.push(p);
+            }
         }
-
-        current = metadata.parent || null;
     }
 
     return null;
@@ -918,13 +1090,26 @@ const getCommitsBetween = async (
 
     const vcRoot = await ensureVersionControl(repoRoot);
     const commits = [];
-    let current = headCommitId;
+    const visited = new Set();
+    const queue = [headCommitId];
 
-    while (current && current !== baseCommitId) {
+    while (queue.length > 0) {
+        const current = queue.shift();
+
+        if (current === baseCommitId) {
+            continue;
+        }
+
+        if (visited.has(current)) {
+            continue;
+        }
+
+        visited.add(current);
+
         const metadata = await readMeta(vcRoot, current);
 
         if (!metadata) {
-            break;
+            continue;
         }
 
         commits.push({
@@ -932,10 +1117,19 @@ const getCommitsBetween = async (
             message: metadata.message,
             author: metadata.author,
             timestamp: metadata.timestamp,
-            parent: metadata.parent
+            parent: metadata.parent,
+            parents: metadata.parents || (metadata.parent ? [metadata.parent] : [])
         });
 
-        current = metadata.parent || null;
+        const allParents = metadata.parents && metadata.parents.length > 0
+            ? metadata.parents
+            : (metadata.parent ? [metadata.parent] : []);
+
+        for (const p of allParents) {
+            if (!visited.has(p) && p !== baseCommitId) {
+                queue.push(p);
+            }
+        }
     }
 
     return commits;
@@ -955,10 +1149,20 @@ const findPreviousTaggedCommit = async (
 
     const tagged = new Set(taggedCommitIds || []);
     const vcRoot = await ensureVersionControl(repoRoot);
-    let current = fromCommitId;
+    const visited = new Set();
+    const queue = [fromCommitId];
     let steps = 0;
 
-    while (current && steps < MAX_TAG_WALK) {
+    while (queue.length > 0 && steps < MAX_TAG_WALK) {
+        const current = queue.shift();
+
+        if (visited.has(current)) {
+            continue;
+        }
+
+        visited.add(current);
+        steps += 1;
+
         if (tagged.has(current)) {
             return current;
         }
@@ -966,11 +1170,18 @@ const findPreviousTaggedCommit = async (
         const metadata = await readMeta(vcRoot, current);
 
         if (!metadata) {
-            return null;
+            continue;
         }
 
-        current = metadata.parent || null;
-        steps += 1;
+        const allParents = metadata.parents && metadata.parents.length > 0
+            ? metadata.parents
+            : (metadata.parent ? [metadata.parent] : []);
+
+        for (const p of allParents) {
+            if (!visited.has(p)) {
+                queue.push(p);
+            }
+        }
     }
 
     return null;
@@ -1642,6 +1853,185 @@ const restoreBranchRef = async (
     return true;
 };
 
+const getTreeAtSnapshot = async (vcRoot, commitId, dirPath) => {
+    const snapshot = await getSnapshot(vcRoot, commitId);
+    const prefix = dirPath ? dirPath + "/" : "";
+    const entries = [];
+
+    const seenDirs = new Set();
+
+    for (const filePath of snapshot.files) {
+        if (!filePath.startsWith(prefix)) {
+            continue;
+        }
+
+        const relative = filePath.slice(prefix.length);
+
+        if (relative === "" || relative.includes("/")) {
+            const topLevel = relative.split("/")[0];
+
+            if (!seenDirs.has(topLevel)) {
+                seenDirs.add(topLevel);
+                entries.push({
+                    name: topLevel,
+                    type: "folder",
+                    path: prefix + topLevel
+                });
+            }
+
+            continue;
+        }
+
+        const fullPath = path.join(snapshot.root, filePath);
+        let size = 0;
+
+        try {
+            const stat = await fs.promises.stat(fullPath);
+            size = stat.size;
+        } catch {
+            /* file missing from snapshot */
+        }
+
+        entries.push({
+            name: relative,
+            type: "file",
+            path: filePath,
+            size
+        });
+    }
+
+    entries.sort((a, b) => {
+        if (a.type !== b.type) {
+            return a.type === "folder" ? -1 : 1;
+        }
+
+        return a.name.localeCompare(b.name);
+    });
+
+    return entries;
+};
+
+const getFileAtSnapshot = async (vcRoot, commitId, filePath) => {
+    const snapshot = await getSnapshot(vcRoot, commitId);
+    const fullPath = path.join(snapshot.root, filePath);
+
+    let stat;
+
+    try {
+        stat = await fs.promises.stat(fullPath);
+    } catch {
+        return null;
+    }
+
+    if (stat.isDirectory()) {
+        return { type: "directory" };
+    }
+
+    if (stat.size > MAX_FILE_SIZE) {
+        return {
+            type: "file",
+            size: stat.size,
+            tooLarge: true
+        };
+    }
+
+    const content = await fs.promises.readFile(fullPath, "utf8");
+
+    if (content.includes("\0")) {
+        return {
+            type: "file",
+            size: stat.size,
+            binary: true
+        };
+    }
+
+    return {
+        type: "file",
+        content,
+        size: stat.size,
+        hash: crypto.createHash("sha1").update(content).digest("hex")
+    };
+};
+
+const getRawFileAtSnapshot = async (vcRoot, commitId, filePath) => {
+    const snapshot = await getSnapshot(vcRoot, commitId);
+    const fullPath = path.join(snapshot.root, filePath);
+
+    let stat;
+
+    try {
+        stat = await fs.promises.stat(fullPath);
+    } catch {
+        return null;
+    }
+
+    if (stat.isDirectory()) {
+        return null;
+    }
+
+    const buffer = await fs.promises.readFile(fullPath);
+
+    return {
+        buffer,
+        size: stat.size,
+        name: path.basename(filePath)
+    };
+};
+
+const getFileHistoryForPath = async (
+    repoRoot,
+    filePath,
+    { limit = DEFAULT_HISTORY_LIMIT } = {}
+) => {
+    const vcRoot = await ensureVersionControl(repoRoot);
+    const headCommitId = await getHeadCommitId(vcRoot);
+
+    if (!headCommitId) {
+        return [];
+    }
+
+    const commits = [];
+    let current = headCommitId;
+
+    while (current && commits.length < limit) {
+        let metadata;
+
+        try {
+            metadata = await readMeta(vcRoot, current);
+        } catch {
+            break;
+        }
+
+        if (!metadata) {
+            break;
+        }
+
+        const files = metadata.files || [];
+        const touched = files.some(
+            (f) => f.path === filePath || f.status === "D" && f.path === filePath
+        );
+
+        if (touched) {
+            commits.push({
+                id: metadata.id || current,
+                message: metadata.message,
+                author: metadata.author,
+                timestamp: metadata.timestamp,
+                files: files.filter(
+                    (f) => f.path === filePath
+                )
+            });
+        }
+
+        const allParents = metadata.parents && metadata.parents.length > 0
+            ? metadata.parents
+            : (metadata.parent ? [metadata.parent] : []);
+        current = allParents[0] || null;
+    }
+
+    return commits;
+};
+
 export {
     MAX_COMMIT_MESSAGE_LENGTH,
     DEFAULT_HISTORY_LIMIT,
@@ -1654,7 +2044,9 @@ export {
     getHeadCommitId,
     getWorkingTreeChanges,
     createCommit,
+    createMergeCommit,
     getCommit,
+    isAncestorCommit,
     getCommitHistory,
     listBranches,
     createBranch,
@@ -1667,6 +2059,12 @@ export {
     findPreviousTaggedCommit,
     getCommitsBetween,
     getCommitDiff,
+    getMergeBase,
     fastForwardMerge,
-    restoreBranchRef
+    restoreBranchRef,
+    getTreeAtSnapshot,
+    getSnapshot,
+    getFileAtSnapshot,
+    getRawFileAtSnapshot,
+    getFileHistoryForPath
 };
