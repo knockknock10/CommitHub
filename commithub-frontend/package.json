@@ -13,7 +13,7 @@
     "deploy": "gh-pages -d dist"
   },
   "dependencies": {
-    "axios": "^1.16.1",
+    "axios": "^1.18.0",
     "country-region-data": "^4.1.0",
     "country-state-city": "^3.2.1",
     "react": "^19.2.5",
