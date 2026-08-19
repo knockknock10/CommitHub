@@ -20,6 +20,20 @@ import {
     buildNotificationMessage
 } from "../utils/notificationService.js";
 import { createActivity } from "../utils/activityService.js";
+import {
+    getBranchCommitId,
+    getTreeAtSnapshot,
+    getSnapshot,
+    getFileAtSnapshot,
+    getRawFileAtSnapshot,
+    getFileHistoryForPath,
+    ensureVersionControl,
+    getCommitDiff,
+    getCommitsBetween,
+    createCommit as performCommit,
+    getCommit as readCommit
+} from "../utils/repoVersion.js";
+import { findCommonAncestor, computeAheadBehind } from "../utils/diffMerge.js";
 
 const isVersionControlPath = (root, target) => {
     const relative = path.relative(root, target);
@@ -1231,6 +1245,1037 @@ export const deleteRepository = async (req, res) => {
             message: "Repository deleted"
         });
     }catch(error){
+        return res.status(500).json({
+            message: "Server error"
+        });
+    }
+};
+
+const MIME_TYPES = {
+    ".js": "text/javascript",
+    ".mjs": "text/javascript",
+    ".jsx": "text/javascript",
+    ".ts": "text/javascript",
+    ".tsx": "text/javascript",
+    ".json": "application/json",
+    ".html": "text/html",
+    ".htm": "text/html",
+    ".css": "text/css",
+    ".md": "text/markdown",
+    ".txt": "text/plain",
+    ".xml": "application/xml",
+    ".svg": "image/svg+xml",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".ico": "image/x-icon",
+    ".pdf": "application/pdf",
+    ".zip": "application/zip",
+    ".gz": "application/gzip",
+    ".tar": "application/x-tar",
+    ".wasm": "application/wasm",
+    ".py": "text/x-python",
+    ".java": "text/x-java",
+    ".rb": "text/x-ruby",
+    ".go": "text/x-go",
+    ".rs": "text/x-rust",
+    ".c": "text/x-c",
+    ".cpp": "text/x-c++",
+    ".h": "text/x-c",
+    ".sh": "text/x-shellscript",
+    ".yml": "text/yaml",
+    ".yaml": "text/yaml",
+    ".toml": "text/plain",
+    ".sql": "text/x-sql",
+    ".env": "text/plain",
+    ".gitignore": "text/plain",
+    ".dockerignore": "text/plain",
+    ".lock": "text/plain"
+};
+
+const getMimeType = (filePath) => {
+    const ext = path.extname(filePath).toLowerCase();
+    return MIME_TYPES[ext] || "application/octet-stream";
+};
+
+const DEFAULT_BRANCH_FALLBACK = "main";
+
+const resolveBranchName = (vcRoot, requestedBranch) => {
+    if (typeof requestedBranch === "string" && requestedBranch.trim() !== "") {
+        return requestedBranch.trim();
+    }
+    return DEFAULT_BRANCH_FALLBACK;
+};
+
+/* branch-aware tree: resolve branch → HEAD commit → snapshot → directory */
+export const getBranchTree = async (req, res) => {
+    try {
+        const result = await authorizeRepository(req, res, false);
+
+        if (!result) {
+            return;
+        }
+
+        const repoRoot = getRepoRoot(
+            result.repository.owner,
+            result.repository._id
+        );
+        const vcRoot = await ensureVersionControl(repoRoot);
+        const branchName = resolveBranchName(vcRoot, req.query.branch);
+
+        let commitId;
+
+        try {
+            commitId = await getBranchCommitId(repoRoot, branchName);
+        } catch (error) {
+            if (error.code === "BRANCH_NOT_FOUND") {
+                return res.status(404).json({
+                    message: `Branch "${branchName}" does not exist`
+                });
+            }
+            throw error;
+        }
+
+        const requestedPath =
+            typeof req.query.path === "string"
+                ? req.query.path.trim()
+                : "";
+
+        const root = getRepoRoot(
+            result.repository.owner,
+            result.repository._id
+        );
+
+        if (requestedPath !== "") {
+            const safePath = resolveRepoPath(root, requestedPath);
+
+            if (!safePath) {
+                return res.status(400).json({
+                    message: "Invalid path"
+                });
+            }
+
+            if (safePath === root) {
+                return res.status(400).json({
+                    message: "Invalid path"
+                });
+            }
+        }
+
+        if (!commitId) {
+            return res.status(200).json({
+                branch: branchName,
+                commitId: null,
+                path: requestedPath,
+                entries: []
+            });
+        }
+
+        const entries = await getTreeAtSnapshot(
+            vcRoot,
+            commitId,
+            requestedPath
+        );
+
+        if (requestedPath !== "") {
+            const snapshot = await getSnapshot(vcRoot, commitId);
+            const snapshotFile = path.join(snapshot.root, requestedPath);
+            let stat;
+
+            try {
+                stat = await fs.promises.stat(snapshotFile);
+            } catch {
+                return res.status(404).json({
+                    message: "Path not found"
+                });
+            }
+
+            if (!stat.isDirectory()) {
+                return res.status(400).json({
+                    message: "Path is not a directory"
+                });
+            }
+        }
+
+        const commit = await readCommit(repoRoot, commitId);
+
+        return res.status(200).json({
+            branch: branchName,
+            commitId,
+            commitMessage: commit?.message || "",
+            commitAuthor: commit?.author || null,
+            commitTimestamp: commit?.timestamp || null,
+            path: requestedPath,
+            entries
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: "Server error"
+        });
+    }
+};
+
+/* branch-aware blob: resolve branch → HEAD commit → snapshot → file content */
+export const getBranchBlob = async (req, res) => {
+    try {
+        const result = await authorizeRepository(req, res, false);
+
+        if (!result) {
+            return;
+        }
+
+        const repoRoot = getRepoRoot(
+            result.repository.owner,
+            result.repository._id
+        );
+        const vcRoot = await ensureVersionControl(repoRoot);
+        const branchName = resolveBranchName(vcRoot, req.query.branch);
+
+        let commitId;
+
+        try {
+            commitId = await getBranchCommitId(repoRoot, branchName);
+        } catch (error) {
+            if (error.code === "BRANCH_NOT_FOUND") {
+                return res.status(404).json({
+                    message: `Branch "${branchName}" does not exist`
+                });
+            }
+            throw error;
+        }
+
+        const requestedPath =
+            typeof req.query.path === "string"
+                ? req.query.path.trim()
+                : "";
+
+        if (requestedPath === "") {
+            return res.status(400).json({
+                message: "A file path is required"
+            });
+        }
+
+        const root = getRepoRoot(
+            result.repository.owner,
+            result.repository._id
+        );
+        const safePath = resolveRepoPath(root, requestedPath);
+
+        if (!safePath) {
+            return res.status(400).json({
+                message: "Invalid path"
+            });
+        }
+
+        if (safePath === root) {
+            return res.status(400).json({
+                message: "Path is a directory"
+            });
+        }
+
+        if (!commitId) {
+            return res.status(404).json({
+                message: "No commits on this branch"
+            });
+        }
+
+        const file = await getFileAtSnapshot(vcRoot, commitId, requestedPath);
+
+        if (!file) {
+            return res.status(404).json({
+                message: "File not found"
+            });
+        }
+
+        if (file.type === "directory") {
+            return res.status(400).json({
+                message: "Path is a directory"
+            });
+        }
+
+        const commit = await readCommit(repoRoot, commitId);
+
+        if (file.tooLarge) {
+            return res.status(200).json({
+                branch: branchName,
+                commitId,
+                commitMessage: commit?.message || "",
+                commitAuthor: commit?.author || null,
+                commitTimestamp: commit?.timestamp || null,
+                path: requestedPath,
+                name: path.basename(requestedPath),
+                size: file.size,
+                tooLarge: true
+            });
+        }
+
+        if (file.binary) {
+            return res.status(200).json({
+                branch: branchName,
+                commitId,
+                commitMessage: commit?.message || "",
+                commitAuthor: commit?.author || null,
+                commitTimestamp: commit?.timestamp || null,
+                path: requestedPath,
+                name: path.basename(requestedPath),
+                size: file.size,
+                binary: true
+            });
+        }
+
+        return res.status(200).json({
+            branch: branchName,
+            commitId,
+            commitMessage: commit?.message || "",
+            commitAuthor: commit?.author || null,
+            commitTimestamp: commit?.timestamp || null,
+            path: requestedPath,
+            name: path.basename(requestedPath),
+            content: file.content,
+            size: file.size,
+            hash: file.hash
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: "Server error"
+        });
+    }
+};
+
+/* raw file: serve raw file bytes with appropriate headers */
+export const getRawFile = async (req, res) => {
+    try {
+        const result = await authorizeRepository(req, res, false);
+
+        if (!result) {
+            return;
+        }
+
+        const repoRoot = getRepoRoot(
+            result.repository.owner,
+            result.repository._id
+        );
+        const vcRoot = await ensureVersionControl(repoRoot);
+        const branchName = resolveBranchName(vcRoot, req.query.branch);
+
+        let commitId;
+
+        try {
+            commitId = await getBranchCommitId(repoRoot, branchName);
+        } catch (error) {
+            if (error.code === "BRANCH_NOT_FOUND") {
+                return res.status(404).json({
+                    message: `Branch "${branchName}" does not exist`
+                });
+            }
+            throw error;
+        }
+
+        const requestedPath =
+            typeof req.query.path === "string"
+                ? req.query.path.trim()
+                : "";
+
+        if (requestedPath === "") {
+            return res.status(400).json({
+                message: "A file path is required"
+            });
+        }
+
+        const root = getRepoRoot(
+            result.repository.owner,
+            result.repository._id
+        );
+        const safePath = resolveRepoPath(root, requestedPath);
+
+        if (!safePath || safePath === root) {
+            return res.status(400).json({
+                message: "Invalid path"
+            });
+        }
+
+        if (!commitId) {
+            return res.status(404).json({
+                message: "No commits on this branch"
+            });
+        }
+
+        const raw = await getRawFileAtSnapshot(
+            vcRoot,
+            commitId,
+            requestedPath
+        );
+
+        if (!raw) {
+            return res.status(404).json({
+                message: "File not found"
+            });
+        }
+
+        const mimeType = getMimeType(requestedPath);
+
+        res.setHeader("Content-Type", mimeType);
+        res.setHeader(
+            "Content-Disposition",
+            `attachment; filename="${raw.name}"`
+        );
+        res.setHeader("Content-Length", raw.size);
+
+        return res.status(200).send(raw.buffer);
+    } catch (error) {
+        return res.status(500).json({
+            message: "Server error"
+        });
+    }
+};
+
+/* file history: commits that touched a specific file */
+export const getFileCommitHistory = async (req, res) => {
+    try {
+        const result = await authorizeRepository(req, res, false);
+
+        if (!result) {
+            return;
+        }
+
+        const requestedPath =
+            typeof req.query.path === "string"
+                ? req.query.path.trim()
+                : "";
+
+        if (requestedPath === "") {
+            return res.status(400).json({
+                message: "A file path is required"
+            });
+        }
+
+        const repoRoot = getRepoRoot(
+            result.repository.owner,
+            result.repository._id
+        );
+
+        const limitValue =
+            typeof req.query.limit === "string"
+                ? Math.min(Math.max(Number.parseInt(req.query.limit, 10) || 50, 1), 100)
+                : 50;
+
+        const commits = await getFileHistoryForPath(
+            repoRoot,
+            requestedPath,
+            { limit: limitValue }
+        );
+
+        return res.status(200).json({
+            path: requestedPath,
+            commits: commits.map((c) => ({
+                id: c.id,
+                message: c.message,
+                author: c.author,
+                timestamp: c.timestamp,
+                changeType: c.files?.[0]?.status || null
+            }))
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: "Server error"
+        });
+    }
+};
+
+/* create file through the commit system */
+export const createBranchFile = async (req, res) => {
+    try {
+        const result = await authorizeRepository(req, res, true);
+
+        if (!result) {
+            return;
+        }
+
+        const repoRoot = getRepoRoot(
+            result.repository.owner,
+            result.repository._id
+        );
+        const vcRoot = await ensureVersionControl(repoRoot);
+        const branchName = resolveBranchName(vcRoot, req.body?.branch);
+
+        let commitId;
+
+        try {
+            commitId = await getBranchCommitId(repoRoot, branchName);
+        } catch (error) {
+            if (error.code === "BRANCH_NOT_FOUND") {
+                return res.status(404).json({
+                    message: `Branch "${branchName}" does not exist`
+                });
+            }
+            throw error;
+        }
+
+        const requestedPath =
+            typeof req.body?.path === "string"
+                ? req.body.path.trim()
+                : "";
+
+        if (requestedPath === "") {
+            return res.status(400).json({
+                message: "A file path is required"
+            });
+        }
+
+        const safePath = resolveManagedPath(repoRoot, requestedPath);
+
+        if (!safePath) {
+            return res.status(400).json({
+                message: "Invalid path"
+            });
+        }
+
+        let content;
+
+        try {
+            content = validateWriteContent(req.body?.content);
+        } catch (error) {
+            if (error.code === "CONTENT_TYPE") {
+                return res.status(400).json({
+                    message: "File content must be a string"
+                });
+            }
+
+            if (error.code === "BINARY_FILE") {
+                return res.status(400).json({
+                    message: "Binary file content is not supported"
+                });
+            }
+
+            if (error.code === "TOO_LARGE") {
+                return res.status(413).json({
+                    message: "File is too large"
+                });
+            }
+
+            throw error;
+        }
+
+        const commitMessage =
+            typeof req.body?.commitMessage === "string"
+                ? req.body.commitMessage.trim()
+                : "";
+
+        if (commitMessage === "") {
+            return res.status(400).json({
+                message: "Commit message is required"
+            });
+        }
+
+        if (commitMessage.length > 200) {
+            return res.status(400).json({
+                message: "Commit message must be 200 characters or fewer"
+            });
+        }
+
+        const expectedHead =
+            typeof req.body?.expectedHead === "string"
+                ? req.body.expectedHead.trim()
+                : null;
+
+        if (expectedHead && commitId !== expectedHead) {
+            return res.status(409).json({
+                message: "Repository changed since you started editing"
+            });
+        }
+
+        try {
+            await fs.promises.access(safePath);
+            return res.status(400).json({
+                message: "File already exists"
+            });
+        } catch {
+            /* path is free */
+        }
+
+        await fs.promises.mkdir(
+            path.dirname(safePath),
+            { recursive: true }
+        );
+        await fs.promises.writeFile(safePath, content);
+
+        try {
+            const commit = await performCommit(repoRoot, {
+                message: commitMessage,
+                author: {
+                    name: req.user.userName,
+                    email: req.user.email
+                }
+            });
+
+            await createActivity({
+                actor: req.user._id,
+                type: "COMMIT_CREATED",
+                repository: result.repository._id,
+                commitId: commit.id,
+                metadata: { commitMessage: commit.message }
+            });
+
+            const stat = await fs.promises.stat(safePath);
+
+            return res.status(201).json({
+                commit,
+                file: {
+                    path: requestedPath,
+                    name: path.basename(safePath),
+                    size: stat.size
+                }
+            });
+        } catch (error) {
+            await fs.promises.rm(safePath, { force: true });
+            throw error;
+        }
+    } catch (error) {
+        return res.status(500).json({
+            message: "Server error"
+        });
+    }
+};
+
+/* edit file through the commit system */
+export const editBranchFile = async (req, res) => {
+    try {
+        const result = await authorizeRepository(req, res, true);
+
+        if (!result) {
+            return;
+        }
+
+        const repoRoot = getRepoRoot(
+            result.repository.owner,
+            result.repository._id
+        );
+        const vcRoot = await ensureVersionControl(repoRoot);
+        const branchName = resolveBranchName(vcRoot, req.body?.branch);
+
+        let commitId;
+
+        try {
+            commitId = await getBranchCommitId(repoRoot, branchName);
+        } catch (error) {
+            if (error.code === "BRANCH_NOT_FOUND") {
+                return res.status(404).json({
+                    message: `Branch "${branchName}" does not exist`
+                });
+            }
+            throw error;
+        }
+
+        const requestedPath =
+            typeof req.body?.path === "string"
+                ? req.body.path.trim()
+                : "";
+
+        if (requestedPath === "") {
+            return res.status(400).json({
+                message: "A file path is required"
+            });
+        }
+
+        const safePath = resolveManagedPath(repoRoot, requestedPath);
+
+        if (!safePath) {
+            return res.status(400).json({
+                message: "Invalid path"
+            });
+        }
+
+        let content;
+
+        try {
+            content = validateWriteContent(req.body?.content);
+        } catch (error) {
+            if (error.code === "CONTENT_TYPE") {
+                return res.status(400).json({
+                    message: "File content must be a string"
+                });
+            }
+
+            if (error.code === "BINARY_FILE") {
+                return res.status(400).json({
+                    message: "Binary file content is not supported"
+                });
+            }
+
+            if (error.code === "TOO_LARGE") {
+                return res.status(413).json({
+                    message: "File is too large"
+                });
+            }
+
+            throw error;
+        }
+
+        const commitMessage =
+            typeof req.body?.commitMessage === "string"
+                ? req.body.commitMessage.trim()
+                : "";
+
+        if (commitMessage === "") {
+            return res.status(400).json({
+                message: "Commit message is required"
+            });
+        }
+
+        if (commitMessage.length > 200) {
+            return res.status(400).json({
+                message: "Commit message must be 200 characters or fewer"
+            });
+        }
+
+        const expectedHead =
+            typeof req.body?.expectedHead === "string"
+                ? req.body.expectedHead.trim()
+                : null;
+
+        if (expectedHead && commitId !== expectedHead) {
+            return res.status(409).json({
+                message: "Repository changed since you started editing"
+            });
+        }
+
+        let stat;
+
+        try {
+            stat = await fs.promises.stat(safePath);
+        } catch {
+            return res.status(404).json({
+                message: "File not found"
+            });
+        }
+
+        if (stat.isDirectory()) {
+            return res.status(400).json({
+                message: "Path is a directory"
+            });
+        }
+
+        try {
+            assertRealPathWithin(repoRoot, safePath);
+        } catch {
+            return res.status(400).json({
+                message: "Invalid path"
+            });
+        }
+
+        const previousContent = await fs.promises.readFile(safePath, "utf8");
+        await fs.promises.writeFile(safePath, content);
+
+        try {
+            const commit = await performCommit(repoRoot, {
+                message: commitMessage,
+                author: {
+                    name: req.user.userName,
+                    email: req.user.email
+                }
+            });
+
+            await createActivity({
+                actor: req.user._id,
+                type: "COMMIT_CREATED",
+                repository: result.repository._id,
+                commitId: commit.id,
+                metadata: { commitMessage: commit.message }
+            });
+
+            const updatedStat = await fs.promises.stat(safePath);
+
+            return res.status(200).json({
+                commit,
+                file: {
+                    path: requestedPath,
+                    name: path.basename(safePath),
+                    size: updatedStat.size,
+                    hash: crypto.createHash("sha1")
+                        .update(content)
+                        .digest("hex")
+                }
+            });
+        } catch (error) {
+            await fs.promises.writeFile(safePath, previousContent);
+            throw error;
+        }
+    } catch (error) {
+        return res.status(500).json({
+            message: "Server error"
+        });
+    }
+};
+
+/* delete file through the commit system */
+export const deleteBranchFile = async (req, res) => {
+    try {
+        const result = await authorizeRepository(req, res, true);
+
+        if (!result) {
+            return;
+        }
+
+        const repoRoot = getRepoRoot(
+            result.repository.owner,
+            result.repository._id
+        );
+        const vcRoot = await ensureVersionControl(repoRoot);
+
+        const body = req.body || {};
+        const branchName = resolveBranchName(vcRoot, body.branch);
+
+        let commitId;
+
+        try {
+            commitId = await getBranchCommitId(repoRoot, branchName);
+        } catch (error) {
+            if (error.code === "BRANCH_NOT_FOUND") {
+                return res.status(404).json({
+                    message: `Branch "${branchName}" does not exist`
+                });
+            }
+            throw error;
+        }
+
+        const requestedPath =
+            typeof body.path === "string"
+                ? body.path.trim()
+                : "";
+
+        if (requestedPath === "") {
+            return res.status(400).json({
+                message: "A file path is required"
+            });
+        }
+
+        const safePath = resolveManagedPath(repoRoot, requestedPath);
+
+        if (!safePath) {
+            return res.status(400).json({
+                message: "Invalid path"
+            });
+        }
+
+        let stat;
+
+        try {
+            stat = await fs.promises.stat(safePath);
+        } catch {
+            return res.status(404).json({
+                message: "File not found"
+            });
+        }
+
+        if (stat.isDirectory()) {
+            return res.status(400).json({
+                message: "Path is a directory"
+            });
+        }
+
+        try {
+            assertRealPathWithin(repoRoot, safePath);
+        } catch {
+            return res.status(400).json({
+                message: "Invalid path"
+            });
+        }
+
+        const commitMessage =
+            typeof body.commitMessage === "string"
+                ? body.commitMessage.trim()
+                : "";
+
+        if (commitMessage === "") {
+            return res.status(400).json({
+                message: "Commit message is required"
+            });
+        }
+
+        if (commitMessage.length > 200) {
+            return res.status(400).json({
+                message: "Commit message must be 200 characters or fewer"
+            });
+        }
+
+        const expectedHead =
+            typeof body.expectedHead === "string"
+                ? body.expectedHead.trim()
+                : null;
+
+        if (expectedHead && commitId !== expectedHead) {
+            return res.status(409).json({
+                message: "Repository changed since you started editing"
+            });
+        }
+
+        const previousContent = await fs.promises.readFile(safePath);
+        await fs.promises.rm(safePath, { force: true });
+
+        try {
+            const commit = await performCommit(repoRoot, {
+                message: commitMessage,
+                author: {
+                    name: req.user.userName,
+                    email: req.user.email
+                }
+            });
+
+            await createActivity({
+                actor: req.user._id,
+                type: "COMMIT_CREATED",
+                repository: result.repository._id,
+                commitId: commit.id,
+                metadata: { commitMessage: commit.message }
+            });
+
+            return res.status(200).json({
+                commit,
+                file: {
+                    path: requestedPath
+                }
+            });
+        } catch (error) {
+            await fs.promises.mkdir(
+                path.dirname(safePath),
+                { recursive: true }
+            );
+            await fs.promises.writeFile(safePath, previousContent);
+            throw error;
+        }
+    } catch (error) {
+        return res.status(500).json({
+            message: "Server error"
+        });
+    }
+};
+export const compareBranches = async (req, res) => {
+    try {
+        const result = await authorizeRepository(req, res, false);
+
+        if (!result) {
+            return;
+        }
+
+        const { base, head } = req.query;
+
+        if (!base || typeof base !== "string") {
+            return res.status(400).json({
+                message: "A base branch is required"
+            });
+        }
+
+        if (!head || typeof head !== "string") {
+            return res.status(400).json({
+                message: "A head branch is required"
+            });
+        }
+
+        const repoRoot = getRepoRoot(
+            result.repository.owner,
+            result.repository._id
+        );
+
+        let sourceCommitId = null;
+        let targetCommitId = null;
+
+        try {
+            sourceCommitId = await getBranchCommitId(repoRoot, head);
+        } catch (error) {
+            if (error.code === "BRANCH_NOT_FOUND") {
+                return res.status(400).json({
+                    message: `Branch "${head}" does not exist`
+                });
+            }
+            if (error.code === "INVALID_BRANCH_NAME") {
+                return res.status(400).json({
+                    message: error.message
+                });
+            }
+            throw error;
+        }
+
+        try {
+            targetCommitId = await getBranchCommitId(repoRoot, base);
+        } catch (error) {
+            if (error.code === "BRANCH_NOT_FOUND") {
+                return res.status(400).json({
+                    message: `Branch "${base}" does not exist`
+                });
+            }
+            if (error.code === "INVALID_BRANCH_NAME") {
+                return res.status(400).json({
+                    message: error.message
+                });
+            }
+            throw error;
+        }
+
+        if (sourceCommitId === targetCommitId) {
+            const diff = await getCommitDiff(
+                repoRoot,
+                targetCommitId,
+                sourceCommitId
+            );
+
+            return res.status(200).json({
+                base: { branch: base, commitId: targetCommitId },
+                head: { branch: head, commitId: sourceCommitId },
+                status: "identical",
+                commonAncestor: sourceCommitId,
+                ahead: 0,
+                behind: 0,
+                commitsAhead: [],
+                commitsBehind: [],
+                diff,
+                mergeable: true
+            });
+        }
+
+        const { ancestorId, isDirectAncestor } = await findCommonAncestor(
+            repoRoot,
+            targetCommitId,
+            sourceCommitId
+        );
+
+        const [aheadResult, behindResult] = await Promise.all([
+            computeAheadBehind(repoRoot, targetCommitId, sourceCommitId, ancestorId),
+            computeAheadBehind(repoRoot, sourceCommitId, targetCommitId, ancestorId)
+        ]);
+
+        let status;
+
+        if (isDirectAncestor) {
+            status = "ahead";
+        } else if (aheadResult.ahead > 0 && behindResult.ahead > 0) {
+            status = "diverged";
+        } else if (aheadResult.ahead > 0) {
+            status = "ahead";
+        } else {
+            status = "behind";
+        }
+
+        const [diff, commitsAhead, commitsBehind] = await Promise.all([
+            getCommitDiff(repoRoot, targetCommitId, sourceCommitId),
+            getCommitsBetween(repoRoot, ancestorId || targetCommitId, sourceCommitId),
+            getCommitsBetween(repoRoot, ancestorId || sourceCommitId, targetCommitId)
+        ]);
+
+        return res.status(200).json({
+            base: { branch: base, commitId: targetCommitId },
+            head: { branch: head, commitId: sourceCommitId },
+            status,
+            commonAncestor: ancestorId,
+            ahead: aheadResult.ahead,
+            behind: behindResult.ahead,
+            commitsAhead,
+            commitsBehind,
+            diff,
+            mergeable: !aheadResult.ahead || status === "ahead"
+        });
+    } catch (error) {
         return res.status(500).json({
             message: "Server error"
         });
