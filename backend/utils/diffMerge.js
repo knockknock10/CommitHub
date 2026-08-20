@@ -567,7 +567,8 @@ const performMerge = async (
     const mergeCommit = await createMergeCommit(repoRoot, {
         message: message || `Merge '${sourceBranch}' into '${targetBranch}'`,
         author,
-        parents: [status.targetCommitId, status.sourceCommitId]
+        parents: [status.targetCommitId, status.sourceCommitId],
+        targetBranch
     });
 
     return {
