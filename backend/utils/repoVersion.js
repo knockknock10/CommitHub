@@ -314,7 +314,7 @@ const createCommit = async (repoRoot, { message, author }) => {
 
 const createMergeCommit = async (
     repoRoot,
-    { message, author, parents }
+    { message, author, parents, targetBranch }
 ) => {
     if (!Array.isArray(parents) || parents.length < 2) {
         const error = new Error(
@@ -352,18 +352,20 @@ const createMergeCommit = async (
     const sourceSnapshot = await getSnapshot(vcRoot, parents[1]);
     const sourceFiles = new Set(sourceSnapshot.files);
 
+    const targetCommitId = targetBranch
+        ? await getBranchCommitId(repoRoot, targetBranch)
+        : parents[0];
+    const targetSnapshot = await getSnapshot(vcRoot, targetCommitId);
+    const targetFiles = new Set(targetSnapshot.files);
+
     const mergedFiles = new Set();
 
     for (const file of sourceSnapshot.files) {
         mergedFiles.add(file);
     }
 
-    const baseSnapshot = await getSnapshot(vcRoot, parents[0]);
-
-    for (const file of baseSnapshot.files) {
-        if (!sourceFiles.has(file)) {
-            mergedFiles.add(file);
-        }
+    for (const file of targetSnapshot.files) {
+        mergedFiles.add(file);
     }
 
     const commitId = generateCommitId(
@@ -384,7 +386,7 @@ const createMergeCommit = async (
         for (const file of mergedFiles) {
             const sourcePath = sourceFiles.has(file)
                 ? path.join(sourceSnapshot.root, file)
-                : path.join(baseSnapshot.root, file);
+                : path.join(targetSnapshot.root, file);
 
             const targetPath = path.join(snapshotDir, file);
 
@@ -414,7 +416,8 @@ const createMergeCommit = async (
             JSON.stringify(metadata, null, 2)
         );
 
-        const branch = await getCurrentBranch(vcRoot);
+        const branch = targetBranch
+            || await getCurrentBranch(vcRoot);
 
         await fs.promises.writeFile(
             getBranchRefPath(vcRoot, branch),
