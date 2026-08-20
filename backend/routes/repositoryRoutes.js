@@ -47,6 +47,7 @@ import {
     updatePullRequest
 } from "../controllers/pullRequestController.js";
 import { getMergeAnalysis } from "../controllers/mergeAnalysisController.js";
+import { executeMerge } from "../controllers/mergeBranchController.js";
 import {
     createTag,
     deleteTag,
@@ -159,6 +160,9 @@ router.route("/:id/pull-requests/:number/merge")
 
 router.route("/:id/merge-analysis")
 .get(protect, getMergeAnalysis);
+
+router.route("/:id/merge")
+.post(protect, executeMerge);
 
 router.route("/:id/tags")
 .get(protect, getTags)
