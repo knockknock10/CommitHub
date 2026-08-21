@@ -431,6 +431,138 @@ const createMergeCommit = async (
     }
 };
 
+/* Creates a commit on an arbitrary branch without checking it out.
+   The snapshot is built from a full file-content map instead of the
+   working tree, so the checked-out branch is never disturbed. When
+   mergeParentId is provided the commit records two parents (the branch
+   head plus the merged-in commit), which is how conflict resolutions
+   fold the target branch into the source branch. */
+const createResolutionCommit = async (
+    repoRoot,
+    { branch, files, message, author, mergeParentId = null }
+) => {
+    if (!isValidBranchName(branch)) {
+        const error = new Error("Invalid branch name");
+        error.code = "INVALID_BRANCH_NAME";
+        throw error;
+    }
+
+    if (!files || typeof files !== "object" || Array.isArray(files)) {
+        const error = new Error("Resolved files must be an object");
+        error.code = "INVALID_FILES";
+        throw error;
+    }
+
+    const vcRoot = await ensureVersionControl(repoRoot);
+    const headCommitId = await getBranchCommitId(repoRoot, branch);
+    const parents = mergeParentId
+        ? [headCommitId, mergeParentId]
+        : [headCommitId];
+
+    for (const parentId of parents) {
+        if (!isValidCommitId(parentId)) {
+            const error = new Error("Invalid parent commit ID");
+            error.code = "INVALID_COMMIT_ID";
+            throw error;
+        }
+    }
+
+    const parentMeta = await Promise.all(
+        parents.map((p) => readMeta(vcRoot, p))
+    );
+
+    for (let i = 0; i < parentMeta.length; i += 1) {
+        if (!parentMeta[i]) {
+            const error = new Error(
+                `Parent commit "${parents[i]}" not found`
+            );
+            error.code = "COMMIT_NOT_FOUND";
+            throw error;
+        }
+    }
+
+    const currentBranch = await getCurrentBranch(vcRoot);
+    let syncWorkingTree = false;
+
+    if (currentBranch === branch) {
+        const changes = await getWorkingTreeChanges(repoRoot);
+
+        if (changes.length > 0) {
+            const error = new Error(
+                "Cannot resolve conflicts while the source branch is checked out with uncommitted changes"
+            );
+            error.code = "DIRTY_TREE";
+            throw error;
+        }
+
+        syncWorkingTree = true;
+    }
+
+    const timestamp = Date.now();
+    const commitId = generateCommitId(
+        author,
+        message,
+        timestamp,
+        headCommitId,
+        [],
+        parents
+    );
+
+    const commitDir = path.join(vcRoot, "commits", commitId);
+    const snapshotDir = path.join(commitDir, "snapshot");
+
+    await fs.promises.mkdir(snapshotDir, { recursive: true });
+
+    try {
+        for (const [filePath, content] of Object.entries(files)) {
+            const targetPath = path.join(snapshotDir, filePath);
+
+            await fs.promises.mkdir(
+                path.dirname(targetPath),
+                { recursive: true }
+            );
+            await fs.promises.writeFile(targetPath, content, "utf-8");
+        }
+
+        const metadata = {
+            id: commitId,
+            message,
+            author: {
+                name: author.name,
+                email: author.email
+            },
+            timestamp,
+            parent: headCommitId,
+            parents,
+            merge: Boolean(mergeParentId),
+            files: []
+        };
+
+        await fs.promises.writeFile(
+            path.join(commitDir, "meta.json"),
+            JSON.stringify(metadata, null, 2)
+        );
+
+        await fs.promises.writeFile(
+            getBranchRefPath(vcRoot, branch),
+            commitId
+        );
+
+        if (syncWorkingTree) {
+            await applySnapshotToWorkingTree(
+                repoRoot,
+                vcRoot,
+                commitId
+            );
+        }
+
+        return metadata;
+    } catch (error) {
+        await fs.promises.rm(commitDir, { recursive: true, force: true });
+        throw error;
+    }
+};
+
 const readMeta = async (vcRoot, commitId) => {
     if (!isValidCommitId(commitId)) {
         const error = new Error("Invalid commit ID");
@@ -2048,6 +2180,7 @@ export {
     getWorkingTreeChanges,
     createCommit,
     createMergeCommit,
+    createResolutionCommit,
     getCommit,
     isAncestorCommit,
     getCommitHistory,
