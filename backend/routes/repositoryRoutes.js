@@ -39,6 +39,7 @@ import {
     addPullRequestComment,
     closePullRequest,
     createPullRequest,
+    getMergeStatus,
     getPullRequestById,
     getPullRequests,
     mergePullRequest,
@@ -48,6 +49,10 @@ import {
 } from "../controllers/pullRequestController.js";
 import { getMergeAnalysis } from "../controllers/mergeAnalysisController.js";
 import { executeMerge } from "../controllers/mergeBranchController.js";
+import {
+    getConflictDetail,
+    resolveConflicts
+} from "../controllers/conflictResolutionController.js";
 import {
     createTag,
     deleteTag,
@@ -157,6 +162,15 @@ router.route("/:id/pull-requests/:number/comments")
 
 router.route("/:id/pull-requests/:number/merge")
 .post(protect, mergePullRequest);
+
+router.route("/:id/pull-requests/:number/merge-status")
+.get(protect, getMergeStatus);
+
+router.route("/:id/pull-requests/:number/conflicts")
+.get(protect, getConflictDetail);
+
+router.route("/:id/pull-requests/:number/conflicts/resolve")
+.post(protect, resolveConflicts);
 
 router.route("/:id/merge-analysis")
 .get(protect, getMergeAnalysis);
