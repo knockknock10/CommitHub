@@ -179,6 +179,26 @@ export const mergePullRequest = async(id, number)=>{
     );
     return response.data;
 }
+export const fetchPullRequestMergeStatus = async(id, number)=>{
+    const response = await api.get(
+        `/repositories/${id}/pull-requests/${number}/merge-status`
+    );
+    return response.data;
+}
+export const fetchPullRequestConflict = async(id, number, path)=>{
+    const response = await api.get(
+        `/repositories/${id}/pull-requests/${number}/conflicts`,
+        { params: { path } }
+    );
+    return response.data;
+}
+export const resolvePullRequestConflicts = async(id, number, data)=>{
+    const response = await api.post(
+        `/repositories/${id}/pull-requests/${number}/conflicts/resolve`,
+        data
+    );
+    return response.data;
+}
 export const fetchRepositoryTags = async(id, params)=>{
     const response = await api.get(
         `/repositories/${id}/tags`,
