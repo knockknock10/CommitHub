@@ -416,6 +416,166 @@ const computeThreeWayMerge = async (
     };
 };
 
+/* Ranges of ancestor lines a side actually CHANGED: deletions plus the
+   insertion anchors of additions. Context lines are unchanged and are
+   excluded, unlike collectAncestorRanges which spans every touched
+   line for the coarse analysis overlap heuristic. */
+const collectChangedRanges = (operations) => {
+    const ranges = [];
+    let currentStart = null;
+    let currentEnd = null;
+
+    const extend = (line) => {
+        if (currentStart === null) {
+            currentStart = line;
+            currentEnd = line;
+        } else if (line === currentEnd + 1) {
+            currentEnd = line;
+        } else {
+            ranges.push({ start: currentStart, end: currentEnd });
+            currentStart = line;
+            currentEnd = line;
+        }
+    };
+
+    for (const operation of operations) {
+        if (
+            operation.type === "del" ||
+            operation.type === "add"
+        ) {
+            extend(operation.oldLine);
+        }
+    }
+
+    if (currentStart !== null) {
+        ranges.push({ start: currentStart, end: currentEnd });
+    }
+
+    return ranges;
+};
+
+/* Maps a changed ancestor line range onto the lines a single side
+   actually contains for that region. Context/add operations carry real
+   side line numbers; pure deletions collapse to an empty range anchored
+   at the insertion point (end === start - 1). */
+const mapRegionToSide = (operations, start, end, sideLines) => {
+    let firstLine = null;
+    let lastLine = null;
+
+    for (const operation of operations) {
+        if (
+            operation.oldLine < start ||
+            operation.oldLine > end ||
+            operation.type === "del"
+        ) {
+            continue;
+        }
+
+        if (firstLine === null || operation.newLine < firstLine) {
+            firstLine = operation.newLine;
+        }
+
+        if (lastLine === null || operation.newLine > lastLine) {
+            lastLine = operation.newLine;
+        }
+    }
+
+    if (firstLine !== null) {
+        return {
+            start: firstLine,
+            end: lastLine,
+            lines: sideLines.slice(firstLine - 1, lastLine)
+        };
+    }
+
+    let insertAfter = 0;
+
+    for (const operation of operations) {
+        if (
+            operation.type === "del" &&
+            operation.oldLine >= start &&
+            operation.oldLine <= end
+        ) {
+            insertAfter = operation.newLine - 1;
+            break;
+        }
+    }
+
+    return {
+        start: insertAfter,
+        end: insertAfter - 1,
+        lines: []
+    };
+};
+
+/* Computes the conflicting regions of one file as unified ancestor
+   ranges changed by both sides. Line numbers refer to the arrays
+   produced by splitting each version's content on "\n". When there is
+   no ancestor version (both sides added the file) the whole file is
+   reported as one region. */
+const computeConflictRegions = (ancestorLines, sourceLines, targetLines) => {
+    const sourceOps = collectRangeOps(ancestorLines, sourceLines);
+    const targetOps = collectRangeOps(ancestorLines, targetLines);
+
+    const candidates = [
+        ...collectChangedRanges(sourceOps),
+        ...collectChangedRanges(targetOps)
+    ].sort((a, b) => a.start - b.start || a.end - b.end);
+
+    const merged = [];
+
+    for (const range of candidates) {
+        const previous = merged[merged.length - 1];
+
+        if (previous && range.start <= previous.end) {
+            previous.end = Math.max(previous.end, range.end);
+        } else {
+            merged.push({ ...range });
+        }
+    }
+
+    if (
+        merged.length === 0 &&
+        (sourceLines.length > 0 || targetLines.length > 0)
+    ) {
+        return [
+            {
+                baseStart: 1,
+                baseEnd: 0,
+                baseLines: [],
+                source: {
+                    start: 1,
+                    end: sourceLines.length,
+                    lines: [...sourceLines]
+                },
+                target: {
+                    start: 1,
+                    end: targetLines.length,
+                    lines: [...targetLines]
+                }
+            }
+        ];
+    }
+
+    return merged.map((range) => ({
+        baseStart: range.start,
+        baseEnd: range.end,
+        baseLines: ancestorLines.slice(range.start - 1, range.end),
+        source: mapRegionToSide(
+            sourceOps,
+            range.start,
+            range.end,
+            sourceLines
+        ),
+        target: mapRegionToSide(
+            targetOps,
+            range.start,
+            range.end,
+            targetLines
+        )
+    }));
+};
+
 const computeMergeStatus = async (
     repoRoot,
     sourceBranch,
@@ -924,5 +1084,7 @@ export {
     computeThreeWayMerge,
     computeMergeStatus,
     performMerge,
-    computeMergeAnalysis
+    computeMergeAnalysis,
+    computeConflictRegions,
+    readFileFromSnapshot
 };
