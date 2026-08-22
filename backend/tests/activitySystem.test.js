@@ -530,7 +530,7 @@ describe("activity creation: pull requests", () => {
         assert.equal(commented.metadata.pullRequestNumber, 1);
     });
 
-    it("records PR_REVIEWED when a review is submitted", async () => {
+    it("records PR_APPROVED when a review is submitted", async () => {
         const repo = await setupFastForwardRepo();
         const pr = await openPullRequest(repo, otherToken);
 
@@ -545,7 +545,7 @@ describe("activity creation: pull requests", () => {
         const activities = await getRepositoryActivities(repo, ownerToken);
 
         const reviewed = activities.find(
-            (activity) => activity.type === "PR_REVIEWED"
+            (activity) => activity.type === "PR_APPROVED"
         );
 
         assert.ok(reviewed);
