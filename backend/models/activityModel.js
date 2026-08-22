@@ -9,6 +9,8 @@ export const ACTIVITY_TYPES = [
     "PR_CREATED",
     "PR_COMMENTED",
     "PR_REVIEWED",
+    "PR_APPROVED",
+    "PR_CHANGES_REQUESTED",
     "PR_MERGED",
     "PR_CLOSED",
     "PR_REOPENED",
