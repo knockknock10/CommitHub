@@ -511,7 +511,7 @@ describe("notification creation: pull requests", () => {
         assert.equal(notifications.length, 1);
 
         const notification = notifications[0];
-        assert.equal(notification.type, "PR_REVIEWED");
+        assert.equal(notification.type, "PR_APPROVED");
         assert.equal(
             notification.actor.userName,
             "owneruser"
