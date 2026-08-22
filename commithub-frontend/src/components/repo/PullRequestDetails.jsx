@@ -3,10 +3,12 @@ import {
     addPullRequestComment,
     closePullRequest,
     fetchPullRequest,
+    fetchPullRequestMergeStatus,
     mergePullRequest,
     reopenPullRequest,
     submitPullRequestReview
 } from "../../api/repositoryApi";
+import PullRequestConflictResolver from "./PullRequestConflictResolver";
 
 const shortId = (commitId) =>
     commitId?.slice(0, 7) || "";
@@ -15,6 +17,50 @@ const formatFullDate = (timestamp) =>
     timestamp
         ? new Date(timestamp).toLocaleString()
         : "";
+
+const MERGE_STATE_LABELS = {
+    READY: "Ready to merge",
+    CONFLICTS: "Conflicts",
+    ALREADY_UP_TO_DATE: "Already up to date",
+    ALREADY_MERGED: "Merged",
+    CLOSED: "Closed",
+    INVALID: "Unavailable"
+};
+
+const describeMergeError = (error) => {
+    const status = error.response?.status;
+    const serverMessage = error.response?.data?.message;
+
+    if (status === 409) {
+        if (error.response?.data?.status === "CONFLICTS") {
+            return "This pull request has conflicts and cannot be merged.";
+        }
+
+        return serverMessage || "This pull request has already been merged.";
+    }
+
+    if (status === 400) {
+        if (serverMessage && serverMessage.includes("closed")) {
+            return "This pull request is closed.";
+        }
+
+        return serverMessage || "This pull request cannot be merged.";
+    }
+
+    if (status === 401 || status === 403) {
+        return "You are not authorized to merge this pull request.";
+    }
+
+    if (status === 404) {
+        return "Pull request not found.";
+    }
+
+    if (status === 422) {
+        return serverMessage || "The merge request could not be processed.";
+    }
+
+    return serverMessage || "Failed to merge pull request";
+};
 
 const PullRequestDetails = ({
     repository,
@@ -33,9 +79,15 @@ const PullRequestDetails = ({
     const [reviewComment, setReviewComment] = useState("");
     const [reviewing, setReviewing] = useState(false);
     const [expandedFile, setExpandedFile] = useState(null);
+    const [mergeStatus, setMergeStatus] = useState(null);
+    const [statusLoading, setStatusLoading] = useState(true);
+    const [statusError, setStatusError] = useState("");
+    const [merging, setMerging] = useState(false);
 
-    const load = useCallback(async () => {
-        setLoading(true);
+    const load = useCallback(async (silent = false) => {
+        if (!silent) {
+            setLoading(true);
+        }
         setError("");
 
         try {
@@ -50,16 +102,39 @@ const PullRequestDetails = ({
                 "Failed to load pull request"
             );
         } finally {
-            setLoading(false);
+            if (!silent) {
+                setLoading(false);
+            }
+        }
+    }, [repository._id, number]);
+
+    const loadMergeStatus = useCallback(async () => {
+        setStatusLoading(true);
+        setStatusError("");
+
+        try {
+            const data = await fetchPullRequestMergeStatus(
+                repository._id,
+                number
+            );
+            setMergeStatus(data);
+        } catch (error) {
+            setStatusError(
+                error.response?.data?.message ||
+                "Failed to load merge status"
+            );
+        } finally {
+            setStatusLoading(false);
         }
     }, [repository._id, number]);
 
     useEffect(() => {
         load();
-    }, [load]);
+        loadMergeStatus();
+    }, [load, loadMergeStatus]);
 
     const refresh = async () => {
-        await load();
+        await Promise.all([load(true), loadMergeStatus()]);
     };
 
     const handleComment = async () => {
@@ -133,9 +208,7 @@ const PullRequestDetails = ({
         setMessageType("");
 
         try {
-            if (action === "merge") {
-                await mergePullRequest(repository._id, number);
-            } else if (action === "close") {
+            if (action === "close") {
                 await closePullRequest(repository._id, number);
             } else if (action === "reopen") {
                 await reopenPullRequest(repository._id, number);
@@ -151,6 +224,32 @@ const PullRequestDetails = ({
             );
         } finally {
             setSubmitting(false);
+        }
+    };
+
+    const handleMerge = async () => {
+        if (merging) {
+            return;
+        }
+
+        setMerging(true);
+        setMessage("");
+        setMessageType("");
+
+        try {
+            const result = await mergePullRequest(
+                repository._id,
+                number
+            );
+            setMessageType("success");
+            setMessage(result.message || "Pull request merged");
+            await refresh();
+        } catch (error) {
+            setMessageType("error");
+            setMessage(describeMergeError(error));
+            await refresh();
+        } finally {
+            setMerging(false);
         }
     };
 
@@ -187,6 +286,57 @@ const PullRequestDetails = ({
     const isMerged = pullRequest.status === "merged";
     const reviewStates = ["approved", "changes_requested", "commented"];
 
+    const changedFiles = diff?.files || [];
+    const totalAdditions = changedFiles.reduce(
+        (sum, file) => sum + (file.additions || 0),
+        0
+    );
+    const totalDeletions = changedFiles.reduce(
+        (sum, file) => sum + (file.deletions || 0),
+        0
+    );
+
+    const mergeState = mergeStatus?.status || "";
+    const mergeStateLabel =
+        MERGE_STATE_LABELS[mergeState] || "Unavailable";
+    const mergeAvailable =
+        isOwner &&
+        isOpen &&
+        mergeStatus !== null &&
+        mergeStatus.mergeable === true;
+    const isOutOfDate = (mergeStatus?.behind || 0) > 0;
+
+    const mergeSummary = () => {
+        if (!mergeStatus) {
+            return "";
+        }
+
+        switch (mergeStatus.status) {
+            case "READY":
+                return mergeStatus.fastForward
+                    ? "No conflicts with the target branch. Merging will fast-forward the target branch."
+                    : "No conflicts with the target branch.";
+            case "CONFLICTS":
+                return "This pull request cannot be merged automatically.";
+            case "ALREADY_UP_TO_DATE":
+                return "The source branch has no new commits to merge.";
+            case "ALREADY_MERGED":
+                return "This pull request has already been merged.";
+            case "CLOSED":
+                return "This pull request is closed.";
+            case "INVALID":
+                if (mergeStatus.sourceBranchExists === false) {
+                    return `The source branch "${mergeStatus.sourceBranch}" no longer exists.`;
+                }
+                if (mergeStatus.targetBranchExists === false) {
+                    return `The target branch "${mergeStatus.targetBranch}" no longer exists.`;
+                }
+                return "Merge status is unavailable.";
+            default:
+                return "Merge status is unavailable.";
+        }
+    };
+
     return (
         <div className="pull-request-detail">
             <button
@@ -215,7 +365,7 @@ const PullRequestDetails = ({
                     Opened by {pullRequest.author?.userName || "Unknown"}{" "}
                     on {formatFullDate(pullRequest.createdAt)}
                 </p>
-                {isMerged && pullRequest.mergedBy && (
+                {isMerged && (
                     <p>
                         Merged by {pullRequest.mergedBy?.userName ||
                             "Unknown"} on{" "}
@@ -242,23 +392,160 @@ const PullRequestDetails = ({
                 </p>
             )}
 
-            {isOpen && (
-                <div className="pull-request-actions">
-                    {isOwner && (
+            <div className="pull-request-section">
+                <h4>Merge status</h4>
+                {statusLoading && !mergeStatus ? (
+                    <p className="commit-empty">
+                        Checking merge status...
+                    </p>
+                ) : statusError && !mergeStatus ? (
+                    <div className="merge-status-error">
+                        <p className="commit-error">{statusError}</p>
+                        <button
+                            className="pull-request-review-btn"
+                            onClick={loadMergeStatus}
+                        >
+                            Retry
+                        </button>
+                    </div>
+                ) : (
+                    <div
+                        className={`merge-status-card ${
+                            mergeState.toLowerCase() ||
+                            "unavailable"
+                        }`}
+                    >
+                        <div className="merge-status-head">
+                            <span
+                                className={`merge-state-badge ${
+                                    mergeState.toLowerCase() ||
+                                    "unavailable"
+                                }`}
+                            >
+                                {mergeStateLabel}
+                            </span>
+                            <span className="merge-status-branches">
+                                {pullRequest.sourceBranch} →{" "}
+                                {pullRequest.targetBranch}
+                            </span>
+                            <button
+                                className="merge-refresh-btn"
+                                onClick={loadMergeStatus}
+                                disabled={statusLoading || merging}
+                            >
+                                {statusLoading
+                                    ? "Refreshing..."
+                                    : "Refresh status"}
+                            </button>
+                        </div>
+                        <p className="merge-status-summary">
+                            {mergeSummary()}
+                        </p>
+                        <div className="merge-meta">
+                            <span>
+                                {mergeStatus.ahead || 0} commit
+                                {(mergeStatus.ahead || 0) === 1
+                                    ? ""
+                                    : "s"}{" "}
+                                ahead
+                            </span>
+                            <span>
+                                {mergeStatus.behind || 0} behind
+                            </span>
+                            <span>
+                                {changedFiles.length} file
+                                {changedFiles.length === 1 ? "" : "s"}{" "}
+                                changed
+                            </span>
+                            <span className="merge-meta-additions">
+                                +{totalAdditions}
+                            </span>
+                            <span className="merge-meta-deletions">
+                                -{totalDeletions}
+                            </span>
+                        </div>
+                        {isOutOfDate && isOpen && (
+                            <div className="merge-outdated">
+                                This pull request is out of date with
+                                the target branch. Refresh the merge
+                                status to re-check mergeability.
+                            </div>
+                        )}
+                        {mergeStatus.hasConflicts &&
+                            (mergeStatus.conflicts || []).length > 0 && (
+                                <div className="merge-conflicts">
+                                    <h5>Conflicts</h5>
+                                    <p className="merge-conflicts-hint">
+                                        The following files conflict and
+                                        must be resolved before this pull
+                                        request can be merged:
+                                    </p>
+                                    <ul>
+                                        {(mergeStatus.conflicts || []).map(
+                                            (conflict) => (
+                                                <li
+                                                    key={conflict.path}
+                                                    className="merge-conflict-file"
+                                                >
+                                                    <span className="merge-conflict-path">
+                                                        {conflict.path}
+                                                    </span>
+                                                    {conflict.message && (
+                                                        <span className="merge-conflict-reason">
+                                                            {conflict.message}
+                                                        </span>
+                                                    )}
+                                                </li>
+                                            )
+                                        )}
+                                    </ul>
+                                </div>
+                            )}
+                        {isMerged && mergeStatus.mergeCommitId && (
+                            <p className="pull-request-merge-commit">
+                                Merge commit:{" "}
+                                {shortId(mergeStatus.mergeCommitId)} on{" "}
+                                {formatFullDate(
+                                    mergeStatus.mergedAt ||
+                                    pullRequest.mergedAt
+                                )}
+                            </p>
+                        )}
+                    </div>
+                )}
+                {isOwner &&
+                    isOpen &&
+                    mergeStatus !== null &&
+                    mergeStatus.hasConflicts &&
+                    (mergeStatus.conflicts || []).length > 0 && (
+                        <PullRequestConflictResolver
+                            repositoryId={repository._id}
+                            pullRequest={pullRequest}
+                            conflicts={mergeStatus.conflicts}
+                            onResolved={refresh}
+                        />
+                    )}
+                {mergeAvailable && (
+                    <div className="pull-request-actions">
                         <button
                             className="commit-submit-btn"
-                            onClick={() => handleAction("merge")}
-                            disabled={submitting}
+                            onClick={handleMerge}
+                            disabled={merging || submitting}
                         >
-                            {submitting
+                            {merging
                                 ? "Merging..."
                                 : "Merge pull request"}
                         </button>
-                    )}
+                    </div>
+                )}
+            </div>
+
+            {isOpen && (
+                <div className="pull-request-actions">
                     <button
                         className="repo-danger-btn"
                         onClick={() => handleAction("close")}
-                        disabled={submitting}
+                        disabled={submitting || merging}
                     >
                         Close
                     </button>
@@ -309,15 +596,16 @@ const PullRequestDetails = ({
             </div>
 
             <div className="pull-request-section">
-                <h4>Files changed</h4>
+                <h4>Files changed ({changedFiles.length})</h4>
                 {diff && (
                     <p className="commit-change-summary">
                         {diff.stats?.added || 0} added ·{" "}
                         {diff.stats?.deleted || 0} deleted ·{" "}
-                        {diff.stats?.modified || 0} modified
+                        {diff.stats?.modified || 0} modified ·{" "}
+                        +{totalAdditions} -{totalDeletions} lines
                     </p>
                 )}
-                {(diff?.files || []).map((file) => (
+                {changedFiles.map((file) => (
                     <div key={file.path} className="diff-file">
                         <div className="diff-file-header">
                             <button
@@ -393,7 +681,7 @@ const PullRequestDetails = ({
                         )}
                     </div>
                 ))}
-                {diff?.files?.length === 0 && (
+                {changedFiles.length === 0 && (
                     <p className="commit-empty">No file changes.</p>
                 )}
             </div>
