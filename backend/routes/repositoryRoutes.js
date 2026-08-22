@@ -41,12 +41,18 @@ import {
     createPullRequest,
     getMergeStatus,
     getPullRequestById,
+    getPullRequestReviews,
     getPullRequests,
     mergePullRequest,
     reopenPullRequest,
     submitReview,
-    updatePullRequest
+    updatePullRequest,
+    updatePullRequestReview
 } from "../controllers/pullRequestController.js";
+import {
+    getBranchProtection,
+    updateBranchProtection
+} from "../controllers/branchProtectionController.js";
 import { getMergeAnalysis } from "../controllers/mergeAnalysisController.js";
 import { executeMerge } from "../controllers/mergeBranchController.js";
 import {
@@ -155,7 +161,11 @@ router.route("/:id/pull-requests/:number/reopen")
 .post(protect, reopenPullRequest);
 
 router.route("/:id/pull-requests/:number/reviews")
+.get(protect, getPullRequestReviews)
 .post(protect, submitReview);
+
+router.route("/:id/pull-requests/:number/reviews/:reviewId")
+.patch(protect, updatePullRequestReview);
 
 router.route("/:id/pull-requests/:number/comments")
 .post(protect, addPullRequestComment);
@@ -174,6 +184,10 @@ router.route("/:id/pull-requests/:number/conflicts/resolve")
 
 router.route("/:id/merge-analysis")
 .get(protect, getMergeAnalysis);
+
+router.route("/:id/branch-protection/:branch")
+.get(protect, getBranchProtection)
+.put(protect, updateBranchProtection);
 
 router.route("/:id/merge")
 .post(protect, executeMerge);
