@@ -17,6 +17,10 @@ const ReviewSchema = new Schema(
         comment: {
             type: String,
             default: ""
+        },
+        reviewedCommit: {
+            type: String,
+            default: null
         }
     },
     {
