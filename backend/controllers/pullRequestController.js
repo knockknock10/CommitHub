@@ -6,9 +6,13 @@ import {
     getBranchCommitId,
     getCommitsBetween,
     getCommitDiff,
-    fastForwardMerge,
-    restoreBranchRef
+    ensureVersionControl,
+    isAncestorCommit
 } from "../utils/repoVersion.js";
+import {
+    computeMergeStatus,
+    performMerge
+} from "../utils/diffMerge.js";
 import {
     createNotification,
     createMentionNotifications,
@@ -399,6 +403,156 @@ export const getPullRequestById = async (req, res) => {
             targetCommitId,
             sourceBranchExists: sourceCommitId !== null,
             targetBranchExists: targetCommitId !== null
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: "Server error"
+        });
+    }
+};
+
+/* get pull request merge status */
+export const getMergeStatus = async (req, res) => {
+    try {
+        const result = await authorizeRepository(req, res, false);
+
+        if (!result) {
+            return;
+        }
+
+        const number = parseNumber(req.params.number);
+
+        if (number === 0) {
+            return res.status(400).json({
+                message: "Invalid pull request number"
+            });
+        }
+
+        const pullRequest = await findPullRequest(
+            result.repository._id,
+            number
+        );
+
+        if (!pullRequest) {
+            return res.status(404).json({
+                message: "Pull request not found"
+            });
+        }
+
+        if (pullRequest.status === "merged") {
+            return res.status(200).json({
+                status: "ALREADY_MERGED",
+                mergeable: false,
+                sourceBranch: pullRequest.sourceBranch,
+                targetBranch: pullRequest.targetBranch,
+                mergeCommitId: pullRequest.mergeCommitId,
+                mergedAt: pullRequest.mergedAt,
+                mergedBy: pullRequest.mergedBy
+            });
+        }
+
+        if (pullRequest.status === "closed") {
+            return res.status(200).json({
+                status: "CLOSED",
+                mergeable: false,
+                sourceBranch: pullRequest.sourceBranch,
+                targetBranch: pullRequest.targetBranch
+            });
+        }
+
+        const repoRoot = getRepoRoot(
+            result.repository.owner,
+            result.repository._id
+        );
+
+        const readBranchCommit = async (branch) => {
+            try {
+                return await getBranchCommitId(repoRoot, branch);
+            } catch {
+                return null;
+            }
+        };
+
+        const sourceCommitId = await readBranchCommit(
+            pullRequest.sourceBranch
+        );
+        const targetCommitId = await readBranchCommit(
+            pullRequest.targetBranch
+        );
+
+        if (!sourceCommitId || !targetCommitId) {
+            return res.status(200).json({
+                status: "INVALID",
+                mergeable: false,
+                sourceBranch: pullRequest.sourceBranch,
+                targetBranch: pullRequest.targetBranch,
+                sourceBranchExists: sourceCommitId !== null,
+                targetBranchExists: targetCommitId !== null
+            });
+        }
+
+        if (sourceCommitId === targetCommitId) {
+            return res.status(200).json({
+                status: "ALREADY_UP_TO_DATE",
+                mergeable: true,
+                sourceBranch: pullRequest.sourceBranch,
+                targetBranch: pullRequest.targetBranch,
+                sourceCommitId,
+                targetCommitId
+            });
+        }
+
+        const vcRoot = await ensureVersionControl(repoRoot);
+        const sourceIsBehind = await isAncestorCommit(
+            vcRoot,
+            sourceCommitId,
+            targetCommitId
+        );
+
+        if (sourceIsBehind) {
+            return res.status(200).json({
+                status: "ALREADY_UP_TO_DATE",
+                mergeable: true,
+                sourceBranch: pullRequest.sourceBranch,
+                targetBranch: pullRequest.targetBranch,
+                sourceCommitId,
+                targetCommitId
+            });
+        }
+
+        const status = await computeMergeStatus(
+            repoRoot,
+            pullRequest.sourceBranch,
+            pullRequest.targetBranch
+        );
+
+        let mergeStatus;
+
+        if (!status.sourceCommitId || !status.targetCommitId) {
+            mergeStatus = "INVALID";
+        } else if (status.alreadyUpToDate) {
+            mergeStatus = "ALREADY_UP_TO_DATE";
+        } else if (status.hasConflicts) {
+            mergeStatus = "CONFLICTS";
+        } else {
+            mergeStatus = "READY";
+        }
+
+        return res.status(200).json({
+            status: mergeStatus,
+            mergeable: status.mergeable,
+            fastForward: status.fastForward,
+            hasConflicts: status.hasConflicts,
+            conflicts: status.conflicts || [],
+            ahead: status.ahead || 0,
+            behind: status.behind || 0,
+            commonAncestor: status.commonAncestor,
+            sourceCommitId: status.sourceCommitId,
+            targetCommitId: status.targetCommitId,
+            sourceBranch: pullRequest.sourceBranch,
+            targetBranch: pullRequest.targetBranch,
+            sourceBranchExists: status.sourceCommitId !== null,
+            targetBranchExists: status.targetCommitId !== null
         });
     } catch (error) {
         return res.status(500).json({
@@ -900,9 +1054,30 @@ export const mergePullRequest = async (req, res) => {
             });
         }
 
-        if (pullRequest.status !== "open") {
+        if (pullRequest.status === "merged") {
+            return res.status(409).json({
+                message: "Pull request is already merged"
+            });
+        }
+
+        if (pullRequest.status === "closed") {
             return res.status(400).json({
                 message: "Only open pull requests can be merged"
+            });
+        }
+
+        const locked = await PullRequest.findOneAndUpdate(
+            {
+                _id: pullRequest._id,
+                status: "open"
+            },
+            { $set: { status: "merged" } },
+            { returnDocument: "after" }
+        );
+
+        if (!locked) {
+            return res.status(409).json({
+                message: "Pull request is being merged by another request"
             });
         }
 
@@ -931,100 +1106,244 @@ export const mergePullRequest = async (req, res) => {
         );
 
         if (sourceCommitId === null) {
+            locked.status = "open";
+            await locked.save();
+
             return res.status(400).json({
                 message: `Source branch "${pullRequest.sourceBranch}" no longer exists`
             });
         }
 
         if (targetCommitId === null) {
+            locked.status = "open";
+            await locked.save();
+
             return res.status(400).json({
                 message: `Target branch "${pullRequest.targetBranch}" no longer exists`
             });
         }
 
-        let resultData = null;
-        let previousTargetCommitId = null;
-        let workingTreeUpdated = false;
+        const author = {
+            name: req.user.userName,
+            email: req.user.email
+        };
 
-        if (targetCommitId === sourceCommitId) {
-            resultData = {
+        if (sourceCommitId === targetCommitId) {
+            locked.mergedAt = new Date();
+            locked.mergedBy = req.user._id;
+            locked.mergeSourceCommitId = sourceCommitId;
+            locked.mergeCommitId = sourceCommitId;
+            await locked.save();
+
+            await createNotification({
+                recipient: pullRequest.author,
+                actor: req.user._id,
+                type: "PR_MERGED",
+                repository: result.repository._id,
+                pullRequest: pullRequest._id,
+                message: buildNotificationMessage(
+                    "PR_MERGED",
+                    {
+                        title: pullRequest.title,
+                        number: pullRequest.number
+                    }
+                )
+            });
+
+            await createActivity({
+                actor: req.user._id,
+                type: "PR_MERGED",
+                repository: result.repository._id,
+                pullRequest: pullRequest._id,
+                metadata: {
+                    pullRequestNumber: pullRequest.number,
+                    pullRequestTitle: pullRequest.title,
+                    sourceBranch: pullRequest.sourceBranch,
+                    targetBranch: pullRequest.targetBranch,
+                    fastForward: false,
+                    mergeCommitId: sourceCommitId
+                }
+            });
+
+            return res.status(200).json({
+                message: "Pull request merged",
                 merged: true,
-                alreadyUpToDate: true,
+                number: pullRequest.number,
+                sourceBranch: pullRequest.sourceBranch,
+                targetBranch: pullRequest.targetBranch,
+                mergeCommitId: sourceCommitId,
+                fastForward: false,
+                mergedAt: locked.mergedAt,
+                mergedBy: req.user._id,
                 sourceCommitId,
-                targetCommitId
-            };
-        } else {
-            try {
-                resultData = await fastForwardMerge(
-                    repoRoot,
-                    pullRequest.sourceBranch,
-                    pullRequest.targetBranch
-                );
-            } catch (error) {
-                if (error.code === "DIVERGED") {
-                    return res.status(409).json({
-                        message: error.message,
-                        reason: "DIVERGED"
-                    });
+                targetCommitId,
+                alreadyUpToDate: true
+            });
+        }
+
+        const vcRoot = await ensureVersionControl(repoRoot);
+        const sourceIsAncestor = await isAncestorCommit(
+            vcRoot,
+            sourceCommitId,
+            targetCommitId
+        );
+
+        if (sourceIsAncestor) {
+            locked.mergedAt = new Date();
+            locked.mergedBy = req.user._id;
+            locked.mergeSourceCommitId = sourceCommitId;
+            locked.mergeCommitId = sourceCommitId;
+            await locked.save();
+
+            await createNotification({
+                recipient: pullRequest.author,
+                actor: req.user._id,
+                type: "PR_MERGED",
+                repository: result.repository._id,
+                pullRequest: pullRequest._id,
+                message: buildNotificationMessage(
+                    "PR_MERGED",
+                    {
+                        title: pullRequest.title,
+                        number: pullRequest.number
+                    }
+                )
+            });
+
+            await createActivity({
+                actor: req.user._id,
+                type: "PR_MERGED",
+                repository: result.repository._id,
+                pullRequest: pullRequest._id,
+                metadata: {
+                    pullRequestNumber: pullRequest.number,
+                    pullRequestTitle: pullRequest.title,
+                    sourceBranch: pullRequest.sourceBranch,
+                    targetBranch: pullRequest.targetBranch,
+                    fastForward: false,
+                    mergeCommitId: sourceCommitId
                 }
+            });
 
-                if (error.code === "DIRTY_TREE") {
-                    return res.status(400).json({
-                        message: error.message
-                    });
-                }
+            return res.status(200).json({
+                message: "Pull request merged",
+                merged: true,
+                number: pullRequest.number,
+                sourceBranch: pullRequest.sourceBranch,
+                targetBranch: pullRequest.targetBranch,
+                mergeCommitId: sourceCommitId,
+                fastForward: false,
+                mergedAt: locked.mergedAt,
+                mergedBy: req.user._id,
+                sourceCommitId,
+                targetCommitId,
+                alreadyUpToDate: true
+            });
+        }
 
-                if (
-                    error.code === "BRANCH_NOT_FOUND" ||
-                    error.code === "BRANCH_HAS_NO_COMMITS" ||
-                    error.code === "INVALID_BRANCH_NAME"
-                ) {
-                    return res.status(400).json({
-                        message: error.message
-                    });
-                }
+        let mergeResult;
 
-                throw error;
-            }
+        try {
+            mergeResult = await performMerge(
+                repoRoot,
+                pullRequest.sourceBranch,
+                pullRequest.targetBranch,
+                author
+            );
+        } catch (error) {
+            locked.status = "open";
+            await locked.save();
 
-            if (
-                resultData.merged === false &&
-                resultData.reason === "ALREADY_UP_TO_DATE"
-            ) {
-                return res.status(400).json({
-                    message: "Target branch is already up to date"
+            if (error.code === "CONFLICTS_DETECTED") {
+                return res.status(409).json({
+                    message: error.message,
+                    status: "CONFLICTS",
+                    conflicts: error.conflicts
                 });
             }
 
-            previousTargetCommitId =
-                resultData.previousTargetCommitId || null;
-            workingTreeUpdated =
-                resultData.workingTreeUpdated || false;
-        }
-
-        try {
-            pullRequest.status = "merged";
-            pullRequest.mergedAt = new Date();
-            pullRequest.mergedBy = req.user._id;
-            pullRequest.mergeSourceCommitId = sourceCommitId;
-            pullRequest.mergeCommitId =
-                resultData.targetCommitId || sourceCommitId;
-
-            await pullRequest.save();
-        } catch (error) {
-            if (previousTargetCommitId && workingTreeUpdated) {
-                try {
-                    await restoreBranchRef(
-                        repoRoot,
-                        pullRequest.targetBranch,
-                        sourceCommitId,
-                        previousTargetCommitId
-                    );
-                } catch {
-                    /* best effort rollback */
-                }
+            if (error.code === "BRANCH_NOT_FOUND") {
+                return res.status(400).json({
+                    message: error.message
+                });
             }
 
+            if (error.code === "DIRTY_TREE") {
+                return res.status(400).json({
+                    message: error.message
+                });
+            }
+
+            throw error;
+        }
+
+        if (mergeResult.merged === false) {
+            locked.mergedAt = new Date();
+            locked.mergedBy = req.user._id;
+            locked.mergeSourceCommitId = sourceCommitId;
+            locked.mergeCommitId = sourceCommitId;
+            await locked.save();
+
+            await createNotification({
+                recipient: pullRequest.author,
+                actor: req.user._id,
+                type: "PR_MERGED",
+                repository: result.repository._id,
+                pullRequest: pullRequest._id,
+                message: buildNotificationMessage(
+                    "PR_MERGED",
+                    {
+                        title: pullRequest.title,
+                        number: pullRequest.number
+                    }
+                )
+            });
+
+            await createActivity({
+                actor: req.user._id,
+                type: "PR_MERGED",
+                repository: result.repository._id,
+                pullRequest: pullRequest._id,
+                metadata: {
+                    pullRequestNumber: pullRequest.number,
+                    pullRequestTitle: pullRequest.title,
+                    sourceBranch: pullRequest.sourceBranch,
+                    targetBranch: pullRequest.targetBranch,
+                    fastForward: false,
+                    mergeCommitId: sourceCommitId
+                }
+            });
+
+            return res.status(200).json({
+                message: "Pull request merged",
+                merged: true,
+                number: pullRequest.number,
+                sourceBranch: pullRequest.sourceBranch,
+                targetBranch: pullRequest.targetBranch,
+                mergeCommitId: sourceCommitId,
+                fastForward: false,
+                mergedAt: locked.mergedAt,
+                mergedBy: req.user._id,
+                sourceCommitId,
+                targetCommitId,
+                alreadyUpToDate: true
+            });
+        }
+
+        const isFastForward = mergeResult.fastForward === true;
+
+        const mergeCommitId = isFastForward
+            ? mergeResult.targetCommitId
+            : mergeResult.mergeCommitId;
+
+        locked.mergedAt = new Date();
+        locked.mergedBy = req.user._id;
+        locked.mergeSourceCommitId = sourceCommitId;
+        locked.mergeCommitId = mergeCommitId;
+
+        try {
+            await locked.save();
+        } catch (error) {
             throw error;
         }
 
@@ -1050,7 +1369,11 @@ export const mergePullRequest = async (req, res) => {
             pullRequest: pullRequest._id,
             metadata: {
                 pullRequestNumber: pullRequest.number,
-                pullRequestTitle: pullRequest.title
+                pullRequestTitle: pullRequest.title,
+                sourceBranch: pullRequest.sourceBranch,
+                targetBranch: pullRequest.targetBranch,
+                fastForward: isFastForward,
+                mergeCommitId
             }
         });
 
@@ -1060,8 +1383,12 @@ export const mergePullRequest = async (req, res) => {
             number: pullRequest.number,
             sourceBranch: pullRequest.sourceBranch,
             targetBranch: pullRequest.targetBranch,
-            mergeCommitId: pullRequest.mergeCommitId,
-            alreadyUpToDate: resultData.alreadyUpToDate === true
+            mergeCommitId,
+            fastForward: isFastForward,
+            mergedAt: locked.mergedAt,
+            mergedBy: req.user._id,
+            sourceCommitId,
+            targetCommitId
         });
     } catch (error) {
         return res.status(500).json({
