@@ -1174,7 +1174,7 @@ describe("pull request merge", () => {
         await prMergeRequest(repo, number, ownerToken);
         const response = await prMergeRequest(repo, number, ownerToken);
 
-        assert.equal(response.status, 400);
+        assert.equal(response.status, 409);
     });
 
     it("fast-forwards the target branch ref to the source commit", async () => {
@@ -1277,7 +1277,7 @@ describe("pull request merge", () => {
         assert.equal(response.status, 400);
     });
 
-    it("returns 409 with the PR left open when branches have diverged", async () => {
+    it("creates a merge commit when branches have diverged", async () => {
         const repo = await setupFastForwardRepo();
         await checkoutRequest(repo, { name: "dev" }, ownerToken);
         await writeRepoFile(repo, "dev2.txt", "dev2");
@@ -1293,26 +1293,27 @@ describe("pull request merge", () => {
 
         const response = await prMergeRequest(repo, number, ownerToken);
 
-        assert.equal(response.status, 409);
+        assert.equal(response.status, 200);
 
         const body = await response.json();
 
-        assert.equal(body.reason, "DIVERGED");
+        assert.equal(body.merged, true);
+        assert.equal(body.fastForward, false);
+        assert.ok(body.mergeCommitId);
+        assert.notEqual(body.mergeCommitId, before);
 
         const stored = await PullRequest.findOne({
             repository: repo._id,
             number
         });
 
-        assert.equal(stored.status, "open");
-        assert.equal(await readBranchRef(repo, "main"), before);
-        assert.equal(
-            await readRepoFile(repo, "main2.txt"),
-            "main2"
-        );
+        assert.equal(stored.status, "merged");
+        assert.ok(stored.mergeCommitId);
+        assert.ok(stored.mergedAt instanceof Date);
+        assert.equal(stored.mergedBy.toString(), owner._id.toString());
     });
 
-    it("returns 400 when the target is already up to date", async () => {
+    it("marks PR merged when source is already behind target", async () => {
         const repo = await createRepo("uprepo");
         await writeRepoFile(repo, "a.txt", "one");
         await commitHeadCommit(repo, "base");
@@ -1327,11 +1328,21 @@ describe("pull request merge", () => {
 
         const response = await prMergeRequest(repo, number, ownerToken);
 
-        assert.equal(response.status, 400);
+        assert.equal(response.status, 200);
 
         const body = await response.json();
 
-        assert.ok(body.message.includes("up to date"));
+        assert.equal(body.merged, true);
+        assert.equal(body.alreadyUpToDate, true);
+
+        const stored = await PullRequest.findOne({
+            repository: repo._id,
+            number
+        });
+
+        assert.equal(stored.status, "merged");
+        assert.ok(stored.mergedAt instanceof Date);
+        assert.equal(stored.mergedBy.toString(), owner._id.toString());
     });
 
     it("heals a partial merge where the target ref already advanced", async () => {
