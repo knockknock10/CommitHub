@@ -15,13 +15,19 @@ import {
 
 const MAX_ANALYSIS_FILE_LINES = 5000;
 
+/* Ranges of ancestor lines a side removed or rewrote. Unchanged
+   context lines never contribute, so edits on opposite ends of a
+   file do not collide. */
 const collectAncestorRanges = (operations) => {
     const ranges = [];
     let currentStart = null;
     let currentEnd = null;
 
     for (const operation of operations) {
-        if (operation.type === "add") {
+        if (
+            operation.type === "add" ||
+            operation.type === "context"
+        ) {
             continue;
         }
 
@@ -48,6 +54,31 @@ const collectAncestorRanges = (operations) => {
 
 const rangesOverlap = (a, b) =>
     a.start <= b.end && b.start <= a.end;
+
+/* True when both sides inserted lines into the same gap between
+   ancestor lines (0 = above the first line). Insertions never touch
+   existing lines, but two insertions into one gap have no
+   deterministic order. */
+const sharesInsertionGap = (sourceOperations, targetOperations) => {
+    const gaps = new Set();
+
+    for (const operation of sourceOperations) {
+        if (operation.type === "add") {
+            gaps.add(operation.oldLine - 1);
+        }
+    }
+
+    for (const operation of targetOperations) {
+        if (
+            operation.type === "add" &&
+            gaps.has(operation.oldLine - 1)
+        ) {
+            return true;
+        }
+    }
+
+    return false;
+};
 
 const collectRangeOps = (oldLines, newLines) => {
     const n = oldLines.length;
@@ -418,8 +449,7 @@ const computeThreeWayMerge = async (
 
 /* Ranges of ancestor lines a side actually CHANGED: deletions plus the
    insertion anchors of additions. Context lines are unchanged and are
-   excluded, unlike collectAncestorRanges which spans every touched
-   line for the coarse analysis overlap heuristic. */
+   excluded so disputed regions stay as narrow as possible. */
 const collectChangedRanges = (operations) => {
     const ranges = [];
     let currentStart = null;
@@ -1031,9 +1061,10 @@ const computeMergeAnalysis = async (
         const sourceRanges = collectAncestorRanges(sourceOps);
         const targetRanges = collectAncestorRanges(targetOps);
 
-        const overlaps = sourceRanges.some((s) =>
-            targetRanges.some((t) => rangesOverlap(s, t))
-        );
+        const overlaps =
+            sourceRanges.some((s) =>
+                targetRanges.some((t) => rangesOverlap(s, t))) ||
+            sharesInsertionGap(sourceOps, targetOps);
 
         if (overlaps) {
             conflicts.push({
