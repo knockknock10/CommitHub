@@ -1,5 +1,6 @@
 import PullRequest from "../models/pullRequestModel.js";
 import Repository from "../models/repoModel.js";
+import mongoose from "mongoose";
 import { authorizeRepository } from "../utils/repoAccess.js";
 import { getRepoRoot } from "../utils/repoStorage.js";
 import {
@@ -19,6 +20,11 @@ import {
     buildNotificationMessage
 } from "../utils/notificationService.js";
 import { createActivity } from "../utils/activityService.js";
+import {
+    loadBranchProtection,
+    evaluateReviewRequirements,
+    buildMergeBlockReasons
+} from "../utils/branchProtection.js";
 
 const TITLE_MAX_LENGTH = 200;
 const REVIEW_COMMENT_MAX_LENGTH = 500;
@@ -72,6 +78,44 @@ const deriveReviewState = (reviews) => {
 
     return "pending";
 };
+
+const REVIEW_EVENT_TYPES = {
+    approved: "PR_APPROVED",
+    changes_requested: "PR_CHANGES_REQUESTED",
+    commented: "PR_REVIEWED"
+};
+
+/* resolve the current head of the source branch; null when missing */
+const readBranchHeadCommit = async (repository, branch) => {
+    try {
+        return await getBranchCommitId(
+            getRepoRoot(repository.owner, repository._id),
+            branch
+        );
+    } catch {
+        return null;
+    }
+};
+
+const serializeReview = (
+    review,
+    { stale = false, reviewer = null } = {}
+) => ({
+    id: review._id,
+    reviewer: reviewer
+        ? {
+            _id: reviewer._id,
+            userName: reviewer.userName,
+            email: reviewer.email
+        }
+        : review.reviewer,
+    state: review.state,
+    comment: review.comment,
+    reviewedCommit: review.reviewedCommit,
+    stale,
+    createdAt: review.createdAt,
+    updatedAt: review.updatedAt
+});
 
 /* create pull request */
 export const createPullRequest = async (req, res) => {
@@ -443,6 +487,9 @@ export const getMergeStatus = async (req, res) => {
             return res.status(200).json({
                 status: "ALREADY_MERGED",
                 mergeable: false,
+                blockReasons: [],
+                branchProtection: null,
+                reviewRequirements: null,
                 sourceBranch: pullRequest.sourceBranch,
                 targetBranch: pullRequest.targetBranch,
                 mergeCommitId: pullRequest.mergeCommitId,
@@ -455,6 +502,9 @@ export const getMergeStatus = async (req, res) => {
             return res.status(200).json({
                 status: "CLOSED",
                 mergeable: false,
+                blockReasons: [],
+                branchProtection: null,
+                reviewRequirements: null,
                 sourceBranch: pullRequest.sourceBranch,
                 targetBranch: pullRequest.targetBranch
             });
@@ -484,6 +534,9 @@ export const getMergeStatus = async (req, res) => {
             return res.status(200).json({
                 status: "INVALID",
                 mergeable: false,
+                blockReasons: [],
+                branchProtection: null,
+                reviewRequirements: null,
                 sourceBranch: pullRequest.sourceBranch,
                 targetBranch: pullRequest.targetBranch,
                 sourceBranchExists: sourceCommitId !== null,
@@ -495,6 +548,7 @@ export const getMergeStatus = async (req, res) => {
             return res.status(200).json({
                 status: "ALREADY_UP_TO_DATE",
                 mergeable: true,
+                blockReasons: [],
                 sourceBranch: pullRequest.sourceBranch,
                 targetBranch: pullRequest.targetBranch,
                 sourceCommitId,
@@ -513,6 +567,7 @@ export const getMergeStatus = async (req, res) => {
             return res.status(200).json({
                 status: "ALREADY_UP_TO_DATE",
                 mergeable: true,
+                blockReasons: [],
                 sourceBranch: pullRequest.sourceBranch,
                 targetBranch: pullRequest.targetBranch,
                 sourceCommitId,
@@ -538,9 +593,34 @@ export const getMergeStatus = async (req, res) => {
             mergeStatus = "READY";
         }
 
+        /* branch protection gate — the engine-level result is only
+           mergeable when review requirements are also satisfied */
+        const protection = await loadBranchProtection(
+            result.repository._id,
+            pullRequest.targetBranch
+        );
+
+        const evaluation = evaluateReviewRequirements({
+            reviews: pullRequest.reviews,
+            sourceCommitId: status.sourceCommitId,
+            protection
+        });
+
+        const blockReasons = buildMergeBlockReasons(
+            mergeStatus,
+            evaluation
+        );
+
+        if (
+            blockReasons.length > 0 &&
+            mergeStatus === "READY"
+        ) {
+            mergeStatus = "BLOCKED";
+        }
+
         return res.status(200).json({
             status: mergeStatus,
-            mergeable: status.mergeable,
+            mergeable: blockReasons.length === 0,
             fastForward: status.fastForward,
             hasConflicts: status.hasConflicts,
             conflicts: status.conflicts || [],
@@ -552,7 +632,29 @@ export const getMergeStatus = async (req, res) => {
             sourceBranch: pullRequest.sourceBranch,
             targetBranch: pullRequest.targetBranch,
             sourceBranchExists: status.sourceCommitId !== null,
-            targetBranchExists: status.targetCommitId !== null
+            targetBranchExists: status.targetCommitId !== null,
+            blockReasons,
+            branchProtection: evaluation.enabled
+                ? {
+                    enabled: true,
+                    requiredApprovals:
+                        evaluation.requiredApprovals,
+                    dismissStaleReviews:
+                        evaluation.dismissStaleReviews
+                }
+                : null,
+            reviewRequirements: evaluation.enabled
+                ? {
+                    requiredApprovals:
+                        evaluation.requiredApprovals,
+                    approvalsReceived:
+                        evaluation.approvalsReceived,
+                    changesRequested: evaluation.changesRequested,
+                    staleReviews: evaluation.staleReviews,
+                    reviewState: evaluation.reviewState,
+                    satisfied: evaluation.approvalsSatisfied
+                }
+                : null
         });
     } catch (error) {
         return res.status(500).json({
@@ -859,10 +961,20 @@ export const submitReview = async (req, res) => {
             });
         }
 
+        if (pullRequest.status !== "open") {
+            return res.status(400).json({
+                message: "Only open pull requests can be reviewed"
+            });
+        }
+
         if (
             pullRequest.author.toString() ===
             req.user._id.toString()
         ) {
+            /* Self-approval is prohibited: the author reviewing their
+               own changes defeats the purpose of an independent review
+               gate, so authors can comment on the PR but never record
+               approved / changes_requested decisions. */
             return res.status(400).json({
                 message: "You cannot review your own pull request"
             });
@@ -887,22 +999,53 @@ export const submitReview = async (req, res) => {
             });
         }
 
+        const sourceCommitId = await readBranchHeadCommit(
+            result.repository,
+            pullRequest.sourceBranch
+        );
+
+        if (state !== "commented" && !sourceCommitId) {
+            return res.status(400).json({
+                message: `Source branch "${pullRequest.sourceBranch}" no longer exists`
+            });
+        }
+
+        const protection = await loadBranchProtection(
+            result.repository._id,
+            pullRequest.targetBranch
+        );
+
+        const evaluationBefore = evaluateReviewRequirements({
+            reviews: pullRequest.reviews,
+            sourceCommitId,
+            protection
+        });
+
         pullRequest.reviews.push({
             reviewer: req.user._id,
             state,
-            comment
+            comment,
+            reviewedCommit: sourceCommitId
         });
 
         await pullRequest.save();
 
+        const evaluationAfter = evaluateReviewRequirements({
+            reviews: pullRequest.reviews,
+            sourceCommitId,
+            protection
+        });
+
+        const eventType = REVIEW_EVENT_TYPES[state] || "PR_REVIEWED";
+
         await createNotification({
             recipient: pullRequest.author,
             actor: req.user._id,
-            type: "PR_REVIEWED",
+            type: eventType,
             repository: result.repository._id,
             pullRequest: pullRequest._id,
             message: buildNotificationMessage(
-                "PR_REVIEWED",
+                eventType,
                 {
                     title: pullRequest.title,
                     number: pullRequest.number
@@ -910,14 +1053,38 @@ export const submitReview = async (req, res) => {
             )
         });
 
+        /* notify once, exactly when the approval threshold is crossed */
+        if (
+            evaluationAfter.enabled &&
+            !evaluationBefore.approvalsSatisfied &&
+            evaluationAfter.approvalsSatisfied
+        ) {
+            await createNotification({
+                recipient: pullRequest.author,
+                actor: req.user._id,
+                type: "PR_REVIEW_REQUIREMENTS_MET",
+                repository: result.repository._id,
+                pullRequest: pullRequest._id,
+                message: buildNotificationMessage(
+                    "PR_REVIEW_REQUIREMENTS_MET",
+                    {
+                        title: pullRequest.title,
+                        number: pullRequest.number
+                    }
+                )
+            });
+        }
+
         await createActivity({
             actor: req.user._id,
-            type: "PR_REVIEWED",
+            type: eventType,
             repository: result.repository._id,
             pullRequest: pullRequest._id,
             metadata: {
                 pullRequestNumber: pullRequest.number,
-                reviewState: state
+                pullRequestTitle: pullRequest.title,
+                reviewState: state,
+                reviewedCommit: sourceCommitId
             }
         });
 
@@ -926,7 +1093,277 @@ export const submitReview = async (req, res) => {
         ).populate("reviews.reviewer", "userName email");
 
         return res.status(201).json(
-            populated.reviews[populated.reviews.length - 1]
+            serializeReview(
+                populated.reviews[populated.reviews.length - 1]
+            )
+        );
+    } catch (error) {
+        return res.status(500).json({
+            message: "Server error"
+        });
+    }
+};
+
+/* list pull request reviews */
+export const getPullRequestReviews = async (req, res) => {
+    try {
+        const result = await authorizeRepository(req, res, false);
+
+        if (!result) {
+            return;
+        }
+
+        const number = parseNumber(req.params.number);
+
+        if (number === 0) {
+            return res.status(400).json({
+                message: "Invalid pull request number"
+            });
+        }
+
+        const pullRequest = await PullRequest.findOne({
+            repository: result.repository._id,
+            number
+        }).populate("reviews.reviewer", "userName email");
+
+        if (!pullRequest) {
+            return res.status(404).json({
+                message: "Pull request not found"
+            });
+        }
+
+        const sourceCommitId = await readBranchHeadCommit(
+            result.repository,
+            pullRequest.sourceBranch
+        );
+
+        const protection = await loadBranchProtection(
+            result.repository._id,
+            pullRequest.targetBranch
+        );
+
+        const evaluation = evaluateReviewRequirements({
+            reviews: pullRequest.reviews,
+            sourceCommitId,
+            protection
+        });
+
+        const reviews = pullRequest.reviews.map((review) =>
+            serializeReview(review, {
+                /* display staleness reflects raw commit drift;
+                   enforcement of stale dismissals is protection-level */
+                stale:
+                    !review.reviewedCommit ||
+                    review.reviewedCommit !== sourceCommitId
+            })
+        );
+
+        return res.status(200).json({
+            reviews,
+            reviewState: evaluation.reviewState,
+            branchProtection: evaluation.enabled
+                ? {
+                    enabled: true,
+                    requiredApprovals:
+                        evaluation.requiredApprovals,
+                    dismissStaleReviews:
+                        evaluation.dismissStaleReviews
+                }
+                : null,
+            reviewSummary: evaluation.enabled
+                ? {
+                    requiredApprovals:
+                        evaluation.requiredApprovals,
+                    approvalsReceived:
+                        evaluation.approvalsReceived,
+                    changesRequested: evaluation.changesRequested,
+                    staleReviews: evaluation.staleReviews,
+                    satisfied: evaluation.approvalsSatisfied
+                }
+                : null,
+            sourceCommitId
+        });
+    } catch (error) {
+        return res.status(500).json({
+            message: "Server error"
+        });
+    }
+};
+
+/* update a pull request review */
+export const updatePullRequestReview = async (req, res) => {
+    try {
+        const result = await authorizeRepository(req, res, false);
+
+        if (!result) {
+            return;
+        }
+
+        const number = parseNumber(req.params.number);
+
+        if (number === 0) {
+            return res.status(400).json({
+                message: "Invalid pull request number"
+            });
+        }
+
+        const { reviewId } = req.params;
+
+        if (!mongoose.Types.ObjectId.isValid(reviewId)) {
+            return res.status(400).json({
+                message: "Invalid review ID"
+            });
+        }
+
+        const pullRequest = await findPullRequest(
+            result.repository._id,
+            number
+        );
+
+        if (!pullRequest) {
+            return res.status(404).json({
+                message: "Pull request not found"
+            });
+        }
+
+        if (pullRequest.status !== "open") {
+            return res.status(400).json({
+                message: "Only open pull requests can be reviewed"
+            });
+        }
+
+        const review = pullRequest.reviews.id(reviewId);
+
+        if (!review) {
+            return res.status(404).json({
+                message: "Review not found"
+            });
+        }
+
+        /* only the original reviewer or the repository owner may
+           revise a review; arbitrary users cannot rewrite someone
+           else's decision */
+        const isReviewer =
+            review.reviewer.toString() ===
+            req.user._id.toString();
+
+        if (!isReviewer && !result.isOwner) {
+            return res.status(403).json({
+                message: "You do not have permission to update this review"
+            });
+        }
+
+        const state = req.body?.state ?? review.state;
+
+        if (!REVIEW_STATES.includes(state)) {
+            return res.status(400).json({
+                message: "Review state must be approved, changes_requested, or commented"
+            });
+        }
+
+        const comment =
+            typeof req.body?.comment === "string"
+                ? req.body.comment.trim()
+                : review.comment;
+
+        if (comment.length > REVIEW_COMMENT_MAX_LENGTH) {
+            return res.status(400).json({
+                message: `Review comment must be ${REVIEW_COMMENT_MAX_LENGTH} characters or fewer`
+            });
+        }
+
+        const sourceCommitId = await readBranchHeadCommit(
+            result.repository,
+            pullRequest.sourceBranch
+        );
+
+        if (state !== "commented" && !sourceCommitId) {
+            return res.status(400).json({
+                message: `Source branch "${pullRequest.sourceBranch}" no longer exists`
+            });
+        }
+
+        const protection = await loadBranchProtection(
+            result.repository._id,
+            pullRequest.targetBranch
+        );
+
+        const evaluationBefore = evaluateReviewRequirements({
+            reviews: pullRequest.reviews,
+            sourceCommitId,
+            protection
+        });
+
+        review.state = state;
+        review.comment = comment;
+        review.reviewedCommit = sourceCommitId;
+
+        await pullRequest.save();
+
+        const evaluationAfter = evaluateReviewRequirements({
+            reviews: pullRequest.reviews,
+            sourceCommitId,
+            protection
+        });
+
+        const eventType = REVIEW_EVENT_TYPES[state] || "PR_REVIEWED";
+
+        await createNotification({
+            recipient: pullRequest.author,
+            actor: req.user._id,
+            type: eventType,
+            repository: result.repository._id,
+            pullRequest: pullRequest._id,
+            message: buildNotificationMessage(
+                eventType,
+                {
+                    title: pullRequest.title,
+                    number: pullRequest.number
+                }
+            )
+        });
+
+        if (
+            evaluationAfter.enabled &&
+            !evaluationBefore.approvalsSatisfied &&
+            evaluationAfter.approvalsSatisfied
+        ) {
+            await createNotification({
+                recipient: pullRequest.author,
+                actor: req.user._id,
+                type: "PR_REVIEW_REQUIREMENTS_MET",
+                repository: result.repository._id,
+                pullRequest: pullRequest._id,
+                message: buildNotificationMessage(
+                    "PR_REVIEW_REQUIREMENTS_MET",
+                    {
+                        title: pullRequest.title,
+                        number: pullRequest.number
+                    }
+                )
+            });
+        }
+
+        await createActivity({
+            actor: req.user._id,
+            type: eventType,
+            repository: result.repository._id,
+            pullRequest: pullRequest._id,
+            metadata: {
+                pullRequestNumber: pullRequest.number,
+                pullRequestTitle: pullRequest.title,
+                reviewState: state,
+                reviewedCommit: sourceCommitId,
+                updated: true
+            }
+        });
+
+        const populated = await PullRequest.findById(
+            pullRequest._id
+        ).populate("reviews.reviewer", "userName email");
+
+        return res.status(200).json(
+            serializeReview(populated.reviews.id(reviewId))
         );
     } catch (error) {
         return res.status(500).json({
@@ -1121,6 +1558,38 @@ export const mergePullRequest = async (req, res) => {
             return res.status(400).json({
                 message: `Target branch "${pullRequest.targetBranch}" no longer exists`
             });
+        }
+
+        /* branch protection gate — recalculated at merge time from
+           live branch heads and current reviews; the merge engine is
+           never invoked when requirements are unsatisfied */
+        const protection = await loadBranchProtection(
+            result.repository._id,
+            pullRequest.targetBranch
+        );
+
+        if (protection?.enabled) {
+            const evaluation = evaluateReviewRequirements({
+                reviews: pullRequest.reviews,
+                sourceCommitId,
+                protection
+            });
+
+            const blockReasons = buildMergeBlockReasons(
+                "READY",
+                evaluation
+            );
+
+            if (blockReasons.length > 0) {
+                locked.status = "open";
+                await locked.save();
+
+                return res.status(403).json({
+                    message: "Merge blocked by branch protection",
+                    reason: "BRANCH_PROTECTION",
+                    blockReasons
+                });
+            }
         }
 
         const author = {
