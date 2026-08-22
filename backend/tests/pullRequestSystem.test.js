@@ -1839,7 +1839,7 @@ describe("pull request activity and notification generation", () => {
         assert.equal(notifications.length, 0);
     });
 
-    it("records PR_REVIEWED activity and notifies the author when reviewed", async () => {
+    it("records PR_APPROVED activity and notifies the author when approved", async () => {
         const repo = await setupFastForwardRepo();
         const created = await openPullRequest(repo);
         const number = (await created.json()).number;
@@ -1852,7 +1852,7 @@ describe("pull request activity and notification generation", () => {
         );
 
         const activities = await Activity.find({
-            type: "PR_REVIEWED"
+            type: "PR_APPROVED"
         });
 
         assert.equal(activities.length, 1);
@@ -1861,9 +1861,10 @@ describe("pull request activity and notification generation", () => {
             other._id.toString()
         );
         assert.equal(activities[0].metadata.reviewState, "approved");
+        assert.ok(activities[0].metadata.reviewedCommit);
 
         const notifications = await Notification.find({
-            type: "PR_REVIEWED"
+            type: "PR_APPROVED"
         });
 
         assert.equal(notifications.length, 1);
