@@ -16,6 +16,12 @@ const MESSAGE_TEMPLATES = {
         `commented on your pull request: "${ctx.title}" (#${ctx.number})`,
     PR_REVIEWED: (ctx) =>
         `reviewed your pull request: "${ctx.title}" (#${ctx.number})`,
+    PR_APPROVED: (ctx) =>
+        `approved your pull request: "${ctx.title}" (#${ctx.number})`,
+    PR_CHANGES_REQUESTED: (ctx) =>
+        `requested changes on your pull request: "${ctx.title}" (#${ctx.number})`,
+    PR_REVIEW_REQUIREMENTS_MET: (ctx) =>
+        `review requirements are now satisfied for: "${ctx.title}" (#${ctx.number})`,
     PR_MERGED: (ctx) =>
         `merged your pull request: "${ctx.title}" (#${ctx.number})`,
     PR_CLOSED: (ctx) =>
