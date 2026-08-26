@@ -9,6 +9,7 @@ import {
     submitPullRequestReview
 } from "../../api/repositoryApi";
 import PullRequestConflictResolver from "./PullRequestConflictResolver";
+import { useAuth } from "../../context/AuthContext";
 
 const shortId = (commitId) =>
     commitId?.slice(0, 7) || "";
@@ -21,6 +22,7 @@ const formatFullDate = (timestamp) =>
 const MERGE_STATE_LABELS = {
     READY: "Ready to merge",
     CONFLICTS: "Conflicts",
+    BLOCKED: "Review required",
     ALREADY_UP_TO_DATE: "Already up to date",
     ALREADY_MERGED: "Merged",
     CLOSED: "Closed",
@@ -83,6 +85,7 @@ const PullRequestDetails = ({
     const [statusLoading, setStatusLoading] = useState(true);
     const [statusError, setStatusError] = useState("");
     const [merging, setMerging] = useState(false);
+    const { user } = useAuth();
 
     const load = useCallback(async (silent = false) => {
         if (!silent) {
@@ -285,6 +288,12 @@ const PullRequestDetails = ({
     const isOpen = pullRequest.status === "open";
     const isMerged = pullRequest.status === "merged";
     const reviewStates = ["approved", "changes_requested", "commented"];
+    /* the backend rejects self-reviews; hide the controls to match */
+    const canReview =
+        isOpen &&
+        user !== null &&
+        pullRequest.author?._id !== undefined &&
+        pullRequest.author._id !== user._id;
 
     const changedFiles = diff?.files || [];
     const totalAdditions = changedFiles.reduce(
@@ -316,6 +325,8 @@ const PullRequestDetails = ({
                 return mergeStatus.fastForward
                     ? "No conflicts with the target branch. Merging will fast-forward the target branch."
                     : "No conflicts with the target branch.";
+            case "BLOCKED":
+                return "Branch protection requirements are not satisfied yet.";
             case "CONFLICTS":
                 return "This pull request cannot be merged automatically.";
             case "ALREADY_UP_TO_DATE":
@@ -469,6 +480,48 @@ const PullRequestDetails = ({
                                 This pull request is out of date with
                                 the target branch. Refresh the merge
                                 status to re-check mergeability.
+                            </div>
+                        )}
+                        {mergeStatus.branchProtection && (
+                            <div className="protection-panel">
+                                <h5>Branch protection</h5>
+                                <p className="protection-summary">
+                                    {mergeStatus.reviewRequirements.approvalsReceived}{" "}
+                                    approval
+                                    {(mergeStatus.reviewRequirements.approvalsReceived) === 1
+                                        ? ""
+                                        : "s"}{" "}
+                                    received ·{" "}
+                                    {mergeStatus.reviewRequirements.requiredApprovals}{" "}
+                                    required
+                                    {mergeStatus.reviewRequirements.staleReviews > 0 && (
+                                        <>
+                                            {" "}·{" "}
+                                            {mergeStatus.reviewRequirements.staleReviews}{" "}
+                                            stale
+                                        </>
+                                    )}
+                                </p>
+                                {mergeStatus.reviewRequirements.satisfied && !mergeStatus.hasConflicts ? (
+                                    <p className="protection-satisfied">
+                                        All review requirements are satisfied.
+                                    </p>
+                                ) : (
+                                    <ul className="merge-block-reasons">
+                                        {(mergeStatus.blockReasons || []).map(
+                                            (reason) => (
+                                                <li key={reason.code}>
+                                                    <span className="block-reason-code">
+                                                        {reason.code}
+                                                    </span>
+                                                    <span className="block-reason-message">
+                                                        {reason.message}
+                                                    </span>
+                                                </li>
+                                            )
+                                        )}
+                                    </ul>
+                                )}
                             </div>
                         )}
                         {mergeStatus.hasConflicts &&
@@ -702,10 +755,20 @@ const PullRequestDetails = ({
                             >
                                 {review.state}
                             </span>
+                            {review.stale && (
+                                <span className="review-stale-badge">
+                                    stale
+                                </span>
+                            )}
                             <span className="review-date">
                                 {formatFullDate(review.createdAt)}
                             </span>
                         </div>
+                        {review.reviewedCommit && (
+                            <p className="review-meta-commit">
+                                Reviewed commit: {shortId(review.reviewedCommit)}
+                            </p>
+                        )}
                         {review.comment && (
                             <p className="review-comment">
                                 {review.comment}
@@ -713,7 +776,7 @@ const PullRequestDetails = ({
                         )}
                     </div>
                 ))}
-                {isOpen && (
+                {canReview && (
                     <div className="review-create">
                         {!reviewing ? (
                             <button
