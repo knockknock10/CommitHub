@@ -6,6 +6,7 @@ import IssueList from "../components/issue/IssueList";
 import RepositorySettings from "../components/repo/RepositorySettings";
 import RepositoryCode from "../components/repo/RepositoryCode";
 import RepositoryCommits from "../components/repo/RepositoryCommits";
+import PullRequestList from "../components/repo/PullRequestList";
 import "../styles/repository.css";
 
 const RepositoryPage = () => {
@@ -121,6 +122,7 @@ const RepositoryPage = () => {
                 <div className="repository-tabs">
                     <button onClick={() =>setActiveTab("code")}>Code</button>
                     <button onClick={() =>setActiveTab("issues")}>Issues</button>
+                    <button onClick={() =>setActiveTab("pullrequests")}>Pull requests</button>
                     <button onClick={() =>setActiveTab("branches")}>Branches</button>
                     <button onClick={() =>setActiveTab("commits")}>Commits</button>
                     {repository.isOwner && (
@@ -138,6 +140,12 @@ const RepositoryPage = () => {
                             repositoryId={
                                 repository._id
                             }
+                        />
+                    )}
+                    {activeTab === "pullrequests" && (
+                        <PullRequestList
+                            repository={repository}
+                            isOwner={repository.isOwner}
                         />
                     )}
                     {activeTab === "branches" && (
