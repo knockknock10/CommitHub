@@ -1790,3 +1790,259 @@
     accent-color:#238636;
     cursor:pointer;
 }
+
+.review-comment-section{
+    border:1px solid #30363d;
+    border-radius:12px;
+    padding:20px;
+    margin-top:20px;
+    background:#161b22;
+}
+
+.review-comment-header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    margin-bottom:16px;
+    flex-wrap:wrap;
+    gap:8px;
+}
+
+.review-comment-filters{
+    display:flex;
+    gap:6px;
+}
+
+.review-thread{
+    border:1px solid #30363d;
+    border-radius:8px;
+    margin-bottom:16px;
+    overflow:hidden;
+}
+
+.review-thread-resolved{
+    opacity:.65;
+}
+
+.review-thread-file{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    padding:8px 14px;
+    background:#21262d;
+    border-bottom:1px solid #30363d;
+    font-size:.85rem;
+}
+
+.review-thread-path{
+    color:#58a6ff;
+    font-family:monospace;
+    font-weight:600;
+}
+
+.review-thread-line{
+    color:#8b949e;
+    font-size:.8rem;
+}
+
+.review-outdated-badge{
+    background:#9e6a03;
+    color:#fff;
+    padding:2px 8px;
+    border-radius:10px;
+    font-size:.72rem;
+    font-weight:700;
+    text-transform:uppercase;
+}
+
+.review-resolved-badge{
+    background:#238636;
+    color:#fff;
+    padding:2px 8px;
+    border-radius:10px;
+    font-size:.72rem;
+    font-weight:700;
+    text-transform:uppercase;
+}
+
+.review-comment-card{
+    padding:12px 14px;
+    border-bottom:1px solid #21262d;
+    position:relative;
+}
+
+.review-comment-card:last-child{
+    border-bottom:none;
+}
+
+.review-comment-outdated{
+    border-left:3px solid #9e6a03;
+}
+
+.review-comment-header{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    margin-bottom:6px;
+}
+
+.review-author{
+    color:#e6edf3;
+    font-weight:600;
+    font-size:.85rem;
+}
+
+.review-date{
+    color:#8b949e;
+    font-size:.78rem;
+}
+
+.review-commit-id{
+    color:#8b949e;
+    font-family:monospace;
+    font-size:.75rem;
+    background:#21262d;
+    padding:2px 6px;
+    border-radius:4px;
+}
+
+.review-comment-body{
+    color:#c9d1d9;
+    font-size:.88rem;
+    line-height:1.5;
+    margin:0;
+    white-space:pre-wrap;
+}
+
+.review-delete-btn{
+    background:none;
+    border:none;
+    color:#f85149;
+    font-size:.78rem;
+    cursor:pointer;
+    padding:2px 6px;
+    margin-top:4px;
+    border-radius:4px;
+}
+
+.review-delete-btn:hover{
+    background:rgba(248,81,73,0.15);
+}
+
+.review-thread-actions{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    padding:10px 14px;
+    background:#0d1117;
+}
+
+.review-resolve-btn,
+.review-unresolve-btn{
+    background:#238636;
+    color:#fff;
+    border:none;
+    padding:6px 14px;
+    border-radius:6px;
+    font-size:.82rem;
+    font-weight:600;
+    cursor:pointer;
+}
+
+.review-resolve-btn:hover{
+    background:#2ea043;
+}
+
+.review-unresolve-btn{
+    background:#da3633;
+}
+
+.review-unresolve-btn:hover{
+    background:#f85149;
+}
+
+.review-reply-btn{
+    background:none;
+    border:1px solid #30363d;
+    color:#8b949e;
+    padding:6px 14px;
+    border-radius:6px;
+    font-size:.82rem;
+    cursor:pointer;
+}
+
+.review-reply-btn:hover{
+    color:#e6edf3;
+    border-color:#8b949e;
+}
+
+.review-reply-form{
+    flex:1;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+}
+
+.review-reply-actions{
+    display:flex;
+    gap:8px;
+}
+
+.diff-comment-file-btn{
+    background:none;
+    border:1px solid #30363d;
+    color:#8b949e;
+    padding:4px 10px;
+    border-radius:6px;
+    font-size:.78rem;
+    cursor:pointer;
+    margin-left:auto;
+}
+
+.diff-comment-file-btn:hover{
+    color:#e6edf3;
+    border-color:#8b949e;
+}
+
+.diff-line{
+    display:flex;
+    align-items:stretch;
+    position:relative;
+}
+
+.diff-line-selected{
+    background:rgba(56,139,253,0.12);
+}
+
+.diff-line-comment-btn{
+    position:absolute;
+    right:4px;
+    top:50%;
+    transform:translateY(-50%);
+    background:#238636;
+    color:#fff;
+    border:none;
+    width:20px;
+    height:20px;
+    border-radius:50%;
+    font-size:.75rem;
+    font-weight:700;
+    cursor:pointer;
+    display:none;
+    align-items:center;
+    justify-content:center;
+    line-height:1;
+}
+
+.diff-line:hover .diff-line-comment-btn{
+    display:flex;
+}
+
+.diff-inline-comment-form{
+    padding:12px 14px;
+    border-top:1px solid #30363d;
+    background:#0d1117;
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+}

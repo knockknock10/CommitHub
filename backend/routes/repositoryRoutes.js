@@ -72,6 +72,16 @@ import {
     updateRelease
 } from "../controllers/releaseController.js";
 import {
+    createReviewComment,
+    getReviewComments,
+    getReviewCommentThread,
+    replyToReviewComment,
+    resolveThread,
+    unresolveThread,
+    editReviewComment,
+    deleteReviewComment
+} from "../controllers/reviewCommentController.js";
+import {
     getRepositoryActivity
 } from "../controllers/activityController.js";
 
@@ -169,6 +179,24 @@ router.route("/:id/pull-requests/:number/reviews/:reviewId")
 
 router.route("/:id/pull-requests/:number/comments")
 .post(protect, addPullRequestComment);
+
+router.route("/:id/pull-requests/:number/review-comments")
+.get(protect, getReviewComments)
+.post(protect, createReviewComment);
+
+router.route("/:id/pull-requests/:number/review-comments/:commentId")
+.get(protect, getReviewCommentThread)
+.patch(protect, editReviewComment)
+.delete(protect, deleteReviewComment);
+
+router.route("/:id/pull-requests/:number/review-comments/:commentId/reply")
+.post(protect, replyToReviewComment);
+
+router.route("/:id/pull-requests/:number/review-comments/:commentId/resolve")
+.post(protect, resolveThread);
+
+router.route("/:id/pull-requests/:number/review-comments/:commentId/unresolve")
+.post(protect, unresolveThread);
 
 router.route("/:id/pull-requests/:number/merge")
 .post(protect, mergePullRequest);

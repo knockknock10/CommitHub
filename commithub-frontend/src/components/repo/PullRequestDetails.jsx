@@ -6,9 +6,11 @@ import {
     fetchPullRequestMergeStatus,
     mergePullRequest,
     reopenPullRequest,
-    submitPullRequestReview
+    submitPullRequestReview,
+    createReviewComment
 } from "../../api/repositoryApi";
 import PullRequestConflictResolver from "./PullRequestConflictResolver";
+import ReviewCommentPanel from "./ReviewCommentPanel";
 import { useAuth } from "../../context/AuthContext";
 
 const shortId = (commitId) =>
@@ -85,6 +87,9 @@ const PullRequestDetails = ({
     const [statusLoading, setStatusLoading] = useState(true);
     const [statusError, setStatusError] = useState("");
     const [merging, setMerging] = useState(false);
+    const [commentTarget, setCommentTarget] = useState(null);
+    const [inlineComment, setInlineComment] = useState("");
+    const [inlineSubmitting, setInlineSubmitting] = useState(false);
     const { user } = useAuth();
 
     const load = useCallback(async (silent = false) => {
@@ -253,6 +258,35 @@ const PullRequestDetails = ({
             await refresh();
         } finally {
             setMerging(false);
+        }
+    };
+
+    const handleInlineComment = async () => {
+        if (!inlineComment.trim() || !commentTarget) return;
+
+        setInlineSubmitting(true);
+        try {
+            await createReviewComment(
+                repository._id,
+                number,
+                {
+                    body: inlineComment.trim(),
+                    commit: commentTarget.commit,
+                    filePath: commentTarget.filePath,
+                    line: commentTarget.line
+                }
+            );
+            setInlineComment("");
+            setCommentTarget(null);
+            await refresh();
+        } catch (error) {
+            setMessageType("error");
+            setMessage(
+                error.response?.data?.message ||
+                "Failed to post comment"
+            );
+        } finally {
+            setInlineSubmitting(false);
         }
     };
 
@@ -690,7 +724,64 @@ const PullRequestDetails = ({
                                     +{file.additions || 0} -{file.deletions || 0}
                                 </span>
                             )}
+                            {isOpen && !file.binary && (
+                                <button
+                                    className="diff-comment-file-btn"
+                                    onClick={() =>
+                                        setCommentTarget(
+                                            commentTarget?.filePath === file.path
+                                                ? null
+                                                : {
+                                                    filePath: file.path,
+                                                    commit:
+                                                        pullRequest.commits?.[0]?.id ||
+                                                        commitId,
+                                                    line: null
+                                                }
+                                        )
+                                    }
+                                >
+                                    Comment
+                                </button>
+                            )}
                         </div>
+                        {commentTarget?.filePath === file.path &&
+                            commentTarget.line === null && (
+                                <div className="diff-inline-comment-form">
+                                    <textarea
+                                        className="pull-request-description-input"
+                                        placeholder="Leave a comment on this file..."
+                                        value={inlineComment}
+                                        onChange={(e) =>
+                                            setInlineComment(e.target.value)
+                                        }
+                                        rows={3}
+                                    />
+                                    <div className="review-reply-actions">
+                                        <button
+                                            className="commit-submit-btn"
+                                            onClick={handleInlineComment}
+                                            disabled={
+                                                inlineSubmitting ||
+                                                !inlineComment.trim()
+                                            }
+                                        >
+                                            {inlineSubmitting
+                                                ? "Posting..."
+                                                : "Comment"}
+                                        </button>
+                                        <button
+                                            className="repo-danger-cancel"
+                                            onClick={() => {
+                                                setCommentTarget(null);
+                                                setInlineComment("");
+                                            }}
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            )}
                         {expandedFile === file.path && (
                             file.binary ? (
                                 <p className="commit-empty">
@@ -708,23 +799,69 @@ const PullRequestDetails = ({
                                                     @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
                                                 </div>
                                                 {hunk.lines.map(
-                                                    (line, lineIndex) => (
-                                                        <div
-                                                            key={lineIndex}
-                                                            className={`diff-line diff-line-${line.type}`}
-                                                        >
-                                                            <span className="diff-line-prefix">
-                                                                {line.type === "add"
-                                                                    ? "+"
-                                                                    : line.type === "del"
-                                                                        ? "-"
-                                                                        : " "}
-                                                            </span>
-                                                            <span className="diff-line-text">
-                                                                {line.text}
-                                                            </span>
-                                                        </div>
-                                                    )
+                                                    (line, lineIndex) => {
+                                                        const lineNumber =
+                                                            line.type === "del"
+                                                                ? hunk.oldStart +
+                                                                  lineIndex
+                                                                : line.type === "add"
+                                                                    ? null
+                                                                    : hunk.newStart +
+                                                                      lineIndex;
+                                                        const targetLineNumber =
+                                                            line.type === "add"
+                                                                ? hunk.newStart +
+                                                                  lineIndex
+                                                                : line.type === "del"
+                                                                    ? null
+                                                                    : hunk.newStart +
+                                                                      lineIndex;
+
+                                                        return (
+                                                            <div
+                                                                key={lineIndex}
+                                                                className={`diff-line diff-line-${line.type} ${
+                                                                    commentTarget?.filePath === file.path &&
+                                                                    commentTarget.line === targetLineNumber
+                                                                        ? "diff-line-selected"
+                                                                        : ""
+                                                                }`}
+                                                            >
+                                                                <span className="diff-line-prefix">
+                                                                    {line.type === "add"
+                                                                        ? "+"
+                                                                        : line.type === "del"
+                                                                            ? "-"
+                                                                            : " "}
+                                                                </span>
+                                                                <span className="diff-line-text">
+                                                                    {line.text}
+                                                                </span>
+                                                                {isOpen &&
+                                                                    targetLineNumber != null && (
+                                                                        <button
+                                                                            className="diff-line-comment-btn"
+                                                                            onClick={() =>
+                                                                                setCommentTarget(
+                                                                                    commentTarget?.filePath === file.path &&
+                                                                                    commentTarget.line === targetLineNumber
+                                                                                        ? null
+                                                                                        : {
+                                                                                            filePath: file.path,
+                                                                                            commit:
+                                                                                                pullRequest.commits?.[0]?.id ||
+                                                                                                commitId,
+                                                                                            line: targetLineNumber
+                                                                                        }
+                                                                                )
+                                                                            }
+                                                                        >
+                                                                            +
+                                                                        </button>
+                                                                    )}
+                                                            </div>
+                                                        );
+                                                    }
                                                 )}
                                             </div>
                                         )
@@ -840,6 +977,17 @@ const PullRequestDetails = ({
                     </div>
                 )}
             </div>
+
+            <ReviewCommentPanel
+                repositoryId={repository._id}
+                pullRequestNumber={number}
+                isOpen={isOpen}
+                commitId={
+                    pullRequest.commits?.[0]?.id ||
+                    pullRequest.mergeCommitId ||
+                    ""
+                }
+            />
 
             <div className="pull-request-section">
                 <h4>Comments</h4>
