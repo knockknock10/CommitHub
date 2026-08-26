@@ -166,6 +166,19 @@ export const submitPullRequestReview = async(id, number, data)=>{
     );
     return response.data;
 }
+export const fetchPullRequestReviews = async(id, number)=>{
+    const response = await api.get(
+        `/repositories/${id}/pull-requests/${number}/reviews`
+    );
+    return response.data;
+}
+export const updatePullRequestReview = async(id, number, reviewId, data)=>{
+    const response = await api.patch(
+        `/repositories/${id}/pull-requests/${number}/reviews/${reviewId}`,
+        data
+    );
+    return response.data;
+}
 export const addPullRequestComment = async(id, number, data)=>{
     const response = await api.post(
         `/repositories/${id}/pull-requests/${number}/comments`,
@@ -182,6 +195,19 @@ export const mergePullRequest = async(id, number)=>{
 export const fetchPullRequestMergeStatus = async(id, number)=>{
     const response = await api.get(
         `/repositories/${id}/pull-requests/${number}/merge-status`
+    );
+    return response.data;
+}
+export const fetchBranchProtection = async(id, branch)=>{
+    const response = await api.get(
+        `/repositories/${id}/branch-protection/${encodeURIComponent(branch)}`
+    );
+    return response.data;
+}
+export const updateBranchProtection = async(id, branch, data)=>{
+    const response = await api.put(
+        `/repositories/${id}/branch-protection/${encodeURIComponent(branch)}`,
+        data
     );
     return response.data;
 }
