@@ -62,17 +62,11 @@ export const createIssue = async (req, res) => {
 
 export const getRepositoryIssues = async (req, res) => {
     try {
-        const repository = await Repository.findOne({
-            _id: req.params.id,
-            owner: req.user._id
-        })
-        if (!repository) {
-            return res.status(404).json({
-                message: "Repository Not Found!"
-            })
-        }
+        const auth = await authorizeRepository(req, res, false);
+        if (!auth) return;
+
         const issues = await Issue.find({
-            repository: req.params.id
+            repository: auth.repository._id
         }).populate(
             "author",
             "userName email"
