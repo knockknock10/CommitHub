@@ -6,6 +6,7 @@ import User from "../models/userModel.js";
 import Repository from "../models/repoModel.js";
 import Issue from "../models/issueMode.js";
 import Comment from "../models/commentModel.js";
+import Collaborator from "../models/collaboratorModel.js";
 import {
     MAX_FILE_SIZE,
     getRepoRoot,
@@ -14,7 +15,8 @@ import {
     resolveRepoPath,
     assertRealPathWithin
 } from "../utils/repoStorage.js";
-import { authorizeRepository } from "../utils/repoAccess.js";
+import { authorizeRepository, authorizeRepositoryPermission } from "../utils/repoAccess.js";
+import { getUserRepositoryRole, roleHasPermission, PERMISSIONS } from "../utils/permissionService.js";
 import {
     createNotification,
     buildNotificationMessage
@@ -381,11 +383,32 @@ export const getRepositoryById = async (req,res) => {
                 repoId.toString() === repository._id.toString()
             );
 
-        if (repository.visibility === "public" || isOwner) {
+        if (isOwner) {
             return res.status(200).json({
                 ...repository.toObject(),
                 isStarred,
-                isOwner
+                isOwner,
+                userRole: "owner"
+            });
+        }
+
+        if (repository.visibility === "public") {
+            const role = await getUserRepositoryRole(req.user._id, repository._id);
+            return res.status(200).json({
+                ...repository.toObject(),
+                isStarred,
+                isOwner: false,
+                userRole: role || null
+            });
+        }
+
+        const role = await getUserRepositoryRole(req.user._id, repository._id);
+        if (role) {
+            return res.status(200).json({
+                ...repository.toObject(),
+                isStarred,
+                isOwner: false,
+                userRole: role
             });
         }
 
@@ -1113,9 +1136,12 @@ export const updateRepository = async (req, res) => {
             repository.owner.toString() === req.user._id.toString();
 
         if (!isOwner) {
-            return res.status(403).json({
-                message: "You do not have access to this repository"
-            });
+            const role = await getUserRepositoryRole(req.user._id, repository._id);
+            if (!role || !roleHasPermission(role, PERMISSIONS.MANAGE_SETTINGS)) {
+                return res.status(403).json({
+                    message: "You do not have access to this repository"
+                });
+            }
         }
 
         const { name, description, visibility } = req.body;
@@ -1207,9 +1233,12 @@ export const deleteRepository = async (req, res) => {
             repository.owner.toString() === req.user._id.toString();
 
         if (!isOwner) {
-            return res.status(403).json({
-                message: "You do not have access to this repository"
-            });
+            const role = await getUserRepositoryRole(req.user._id, repository._id);
+            if (!role || !roleHasPermission(role, PERMISSIONS.DELETE)) {
+                return res.status(403).json({
+                    message: "You do not have access to this repository"
+                });
+            }
         }
 
         const issues = await Issue.find({
@@ -1217,6 +1246,8 @@ export const deleteRepository = async (req, res) => {
         });
 
         const issueIds = issues.map((issue) => issue._id);
+
+        await Collaborator.deleteMany({ repository: repository._id });
 
         await Comment.deleteMany({
             issue: { $in: issueIds }
