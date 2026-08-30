@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import BranchProtection from "../models/branchProtectionModel.js";
-import { authorizeRepository } from "../utils/repoAccess.js";
+import { authorizeRepository, authorizeRepositoryPermission } from "../utils/repoAccess.js";
+import { PERMISSIONS } from "../utils/permissionService.js";
 
 const REQUIRED_APPROVALS_MIN = 1;
 const REQUIRED_APPROVALS_MAX = 10;
@@ -77,9 +78,7 @@ export const getBranchProtection = async (req, res) => {
 /* create or update branch protection for a single branch */
 export const updateBranchProtection = async (req, res) => {
     try {
-        /* owner-only: changing merge requirements is a trust decision
-           and must never be available to regular contributors */
-        const result = await authorizeRepository(req, res, true);
+        const result = await authorizeRepositoryPermission(req, res, PERMISSIONS.MANAGE_BRANCH_PROTECTION);
 
         if (!result) {
             return;
