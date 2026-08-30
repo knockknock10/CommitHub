@@ -72,8 +72,29 @@ import {
     updateRelease
 } from "../controllers/releaseController.js";
 import {
+    createReviewComment,
+    getReviewComments,
+    getReviewCommentThread,
+    replyToReviewComment,
+    resolveThread,
+    unresolveThread,
+    editReviewComment,
+    deleteReviewComment
+} from "../controllers/reviewCommentController.js";
+import {
     getRepositoryActivity
 } from "../controllers/activityController.js";
+import {
+    getCollaborators,
+    addCollaborator,
+    updateCollaborator,
+    removeCollaborator,
+    getMyCollaboratorRole
+} from "../controllers/collaboratorController.js";
+import {
+    forkRepository,
+    getRepositoryForks
+} from "../controllers/forkController.js";
 
 const router = express.Router();
 
@@ -170,6 +191,24 @@ router.route("/:id/pull-requests/:number/reviews/:reviewId")
 router.route("/:id/pull-requests/:number/comments")
 .post(protect, addPullRequestComment);
 
+router.route("/:id/pull-requests/:number/review-comments")
+.get(protect, getReviewComments)
+.post(protect, createReviewComment);
+
+router.route("/:id/pull-requests/:number/review-comments/:commentId")
+.get(protect, getReviewCommentThread)
+.patch(protect, editReviewComment)
+.delete(protect, deleteReviewComment);
+
+router.route("/:id/pull-requests/:number/review-comments/:commentId/reply")
+.post(protect, replyToReviewComment);
+
+router.route("/:id/pull-requests/:number/review-comments/:commentId/resolve")
+.post(protect, resolveThread);
+
+router.route("/:id/pull-requests/:number/review-comments/:commentId/unresolve")
+.post(protect, unresolveThread);
+
 router.route("/:id/pull-requests/:number/merge")
 .post(protect, mergePullRequest);
 
@@ -210,6 +249,23 @@ router.route("/:id/releases/:releaseId")
 
 router.route("/:id/activity")
 .get(protect, getRepositoryActivity);
+
+router.route("/:id/collaborators")
+.get(protect, getCollaborators)
+.post(protect, addCollaborator);
+
+router.route("/:id/collaborators/me")
+.get(protect, getMyCollaboratorRole);
+
+router.route("/:id/collaborators/:userId")
+.patch(protect, updateCollaborator)
+.delete(protect, removeCollaborator);
+
+router.route("/:id/fork")
+.post(protect, forkRepository);
+
+router.route("/:id/forks")
+.get(protect, getRepositoryForks);
 
 
 export default router;
