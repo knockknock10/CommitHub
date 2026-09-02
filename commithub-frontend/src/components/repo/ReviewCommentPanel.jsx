@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import {
     fetchReviewComments,
-    createReviewComment,
     replyToReviewComment,
     resolveReviewThread,
     unresolveReviewThread,
@@ -20,8 +19,7 @@ const formatTime = (timestamp) =>
 const ReviewCommentPanel = ({
     repositoryId,
     pullRequestNumber,
-    isOpen,
-    commitId
+    isOpen
 }) => {
     const [comments, setComments] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -287,7 +285,6 @@ function ReviewThread({
             <CommentCard
                 comment={root}
                 currentUser={currentUser}
-                isRoot
                 onDelete={isAuthor || currentUser?._id ? onDelete : null}
             />
 
@@ -385,7 +382,6 @@ function ReviewThread({
 function CommentCard({
     comment,
     currentUser,
-    isRoot,
     onDelete
 }) {
     const isAuthor =
