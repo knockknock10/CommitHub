@@ -1,0 +1,219 @@
+.organization-page {
+    color: #c9d1d9;
+}
+
+/* Header */
+.org-header {
+    margin-bottom: 32px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 20px;
+}
+
+.org-header-main h1 {
+    color: #f0f6fc;
+    font-size: 32px;
+    margin-bottom: 8px;
+}
+
+.org-header-main p {
+    color: #8b949e;
+    font-size: 16px;
+    line-height: 1.5;
+    max-width: 600px;
+}
+
+.org-badge {
+    background: #21262d;
+    border: 1px solid #30363d;
+    color: #8b949e;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+/* Tabs */
+.org-nav {
+    display: flex;
+    gap: 24px;
+    border-bottom: 1px solid #30363d;
+    margin-bottom: 24px;
+}
+
+.org-tab {
+    background: none;
+    border: none;
+    color: #8b949e;
+    padding: 12px 4px;
+    cursor: pointer;
+    font-size: 14px;
+    font-weight: 500;
+    position: relative;
+    transition: color 0.2s;
+}
+
+.org-tab:hover {
+    color: #f0f6fc;
+}
+
+.org-tab.active {
+    color: #f0f6fc;
+}
+
+.org-tab.active::after {
+    content: "";
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: #f78166;
+}
+
+/* Content Area */
+.org-content {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+/* Member List */
+.member-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.member-card {
+    background: #161b22;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    transition: border-color 0.2s;
+}
+
+.member-card:hover {
+    border-color: #8b949e;
+}
+
+.member-info h3 {
+    color: #58a6ff;
+    font-size: 16px;
+    margin: 0 0 4px 0;
+    text-decoration: none;
+}
+
+.member-info p {
+    color: #8b949e;
+    font-size: 13px;
+    margin: 0;
+}
+
+.member-role {
+    font-size: 12px;
+    padding: 2px 8px;
+    border-radius: 10px;
+    background: #21262d;
+    color: #c9d1d9;
+    border: 1px solid #30363d;
+    margin-left: 12px;
+}
+
+.member-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn-remove {
+    background: transparent;
+    border: 1px solid #f85149;
+    color: #f85149;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+}
+
+.btn-remove:hover {
+    background: #f85149;
+    color: white;
+}
+
+/* Invitation Form */
+.invite-section {
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 12px;
+    padding: 20px;
+    margin-bottom: 24px;
+}
+
+.invite-form {
+    display: flex;
+    gap: 12px;
+    align-items: flex-end;
+    flex-wrap: wrap;
+}
+
+.invite-field {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.invite-field label {
+    color: #8b949e;
+    font-size: 12px;
+    font-weight: 500;
+}
+
+.invite-field input, .invite-field select {
+    background: #161b22;
+    border: 1px solid #30363d;
+    color: #c9d1d9;
+    padding: 8px 12px;
+    border-radius: 6px;
+    outline: none;
+}
+
+.btn-invite {
+    background: #238636;
+    color: white;
+    border: none;
+    padding: 9px 16px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.btn-invite:hover {
+    background: #2ea043;
+}
+
+.btn-invite:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+/* Empty State */
+.empty-state {
+    text-align: center;
+    padding: 40px;
+    color: #8b949e;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .org-header {
+        flex-direction: column;
+    }
+    .invite-form {
+        flex-direction: column;
+        align-items: stretch;
+    }
+}
