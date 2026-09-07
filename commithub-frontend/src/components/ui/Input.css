@@ -1,0 +1,61 @@
+.ui-input-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    width: 100%;
+}
+
+.ui-input-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: #8b949e;
+    text-align: left;
+}
+
+.ui-input {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 14px;
+    background: #0d1117;
+    border: 1px solid #30363d;
+    border-radius: 6px;
+    color: #c9d1d9;
+    outline: none;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.ui-input:focus {
+    border-color: #58a6ff;
+    box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
+}
+
+.ui-input:disabled {
+    background: #161b22;
+    color: #484f58;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+
+.ui-input-error {
+    font-size: 12px;
+    color: #f85149;
+    margin-top: 2px;
+}
+
+.input-error {
+    border-color: #f85149 !important;
+}
+
+.ui-textarea {
+    resize: vertical;
+    min-height: 80px;
+}
+
+.ui-select {
+    appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%238b949e' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 12px center;
+    background-size: 16px;
+    padding-right: 40px;
+}

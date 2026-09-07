@@ -278,3 +278,63 @@ export const updateRelease = async(id, releaseId, data)=>{
     );
     return response.data;
 }
+
+export const fetchReviewComments = async(repoId, number, params)=>{
+    const response = await api.get(
+        `/repositories/${repoId}/pull-requests/${number}/review-comments`,
+        { params }
+    );
+    return response.data;
+}
+
+export const createReviewComment = async(repoId, number, data)=>{
+    const response = await api.post(
+        `/repositories/${repoId}/pull-requests/${number}/review-comments`,
+        data
+    );
+    return response.data;
+}
+
+export const fetchReviewCommentThread = async(repoId, number, commentId)=>{
+    const response = await api.get(
+        `/repositories/${repoId}/pull-requests/${number}/review-comments/${commentId}`
+    );
+    return response.data;
+}
+
+export const replyToReviewComment = async(repoId, number, commentId, data)=>{
+    const response = await api.post(
+        `/repositories/${repoId}/pull-requests/${number}/review-comments/${commentId}/reply`,
+        data
+    );
+    return response.data;
+}
+
+export const resolveReviewThread = async(repoId, number, commentId)=>{
+    const response = await api.post(
+        `/repositories/${repoId}/pull-requests/${number}/review-comments/${commentId}/resolve`
+    );
+    return response.data;
+}
+
+export const unresolveReviewThread = async(repoId, number, commentId)=>{
+    const response = await api.post(
+        `/repositories/${repoId}/pull-requests/${number}/review-comments/${commentId}/unresolve`
+    );
+    return response.data;
+}
+
+export const editReviewComment = async(repoId, number, commentId, data)=>{
+    const response = await api.patch(
+        `/repositories/${repoId}/pull-requests/${number}/review-comments/${commentId}`,
+        data
+    );
+    return response.data;
+}
+
+export const deleteReviewComment = async(repoId, number, commentId)=>{
+    const response = await api.delete(
+        `/repositories/${repoId}/pull-requests/${number}/review-comments/${commentId}`
+    );
+    return response.data;
+}

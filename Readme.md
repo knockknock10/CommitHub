@@ -238,6 +238,9 @@ CommitHub uses AWS S3 for storing uploaded files and assets.
 - Pull request merge frontend (live merge status, conflict display, owner-gated merge button, merged metadata)
 - Pull request conflict resolution (base/source/target conflict detail with regions, keep-source/keep-target/custom strategies, resolution committed to the source branch as a merge commit, stale-resolution rejection, BASE/SOURCE/TARGET resolver UI)
 - Pull request reviews and branch protection (commit-tied approvals with stale-review dismissal, required distinct-approver counts, changes-requested blocking, server-enforced merge eligibility with structured block reasons, owner-only protection settings)
+- Code review comments and review threads (file/line-level inline comments, threaded conversations, thread resolution, commit-based outdated detection, notifications, 30 integration tests)
+- CI status checks (commit status lifecycle, webhook-based CI provider integration)
+- External CI status integration (provider registration, HMAC webhook verification, status mapping)
 
 ---
 
