@@ -62,7 +62,11 @@ const BranchProtection = ({ repositoryId, branch }) => {
 
     return (
         <div className="branch-protection-form">
-            {loading && <p>Loading protection rules...</p>}
+            {loading && (
+                <div className="shared-loading">
+                    <p>Loading protection rules...</p>
+                </div>
+            )}
 
             {!loading && (
                 <>
