@@ -1,23 +1,11 @@
 import api from "./axios";
 
-export const getComments = async(issueId)=>{
-    const response = await api.get(
-        `/comments/${issueId}`
-    );
-    return response.data;
-}
-
-export const createComment = async(issueId,data)=>{
-    const response = await api.post(
-        `/comments/${issueId}`,
-        data
-    );
-    return response.data;
-}
-
-export const deleteComment = async(commentId)=>{
-    const response = await api.delete(
-        `/comments/delete/${commentId}`
-    );
-    return response.data;
-}
+export const getComments = async (issueId) => {
+    try { const r = await api.get(`/comments/${issueId}`); return r.data; } catch (e) { if (e && e.offline) throw new Error("Server unreachable"); throw e; }
+};
+export const createComment = async (issueId, data) => {
+    try { const r = await api.post(`/comments/${issueId}`, data); return r.data; } catch (e) { if (e && e.offline) throw new Error("Server unreachable"); throw e; }
+};
+export const deleteComment = async (commentId) => {
+    try { const r = await api.delete(`/comments/delete/${commentId}`); return r.data; } catch (e) { if (e && e.offline) throw new Error("Server unreachable"); throw e; }
+};

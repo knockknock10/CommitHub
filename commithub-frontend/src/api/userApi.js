@@ -1,10 +1,23 @@
 import api from "./axios";
 
-export const getUserProfile = async(id)=>{
+const O = (err) => { if (err && err.offline) throw new Error("Server unreachable"); throw err; };
 
-    const response = await api.get(
-        `/users/profile/${id}`
-    );
+export const getUserProfile = async (id) => {
+    try {
+        const response = await api.get(`/users/profile/${id}`);
+        return response.data;
+    } catch (err) {
+        if (err.offline) throw new Error("Server unreachable");
+        throw err;
+    }
+};
 
-    return response.data;
+export const updateUserProfile = async (data) => {
+    try {
+        const response = await api.patch("/users/me", data);
+        return response.data;
+    } catch (err) {
+        if (err.offline) throw new Error("Server unreachable");
+        throw err;
+    }
 };

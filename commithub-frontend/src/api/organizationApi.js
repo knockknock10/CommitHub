@@ -1,26 +1,22 @@
 import api from "./axios";
 
-export const createOrganization = async (data) => {
-    const response = await api.post("/organizations", data);
-    return response.data;
-};
+const O = (e) => { if (e && e.offline) throw new Error("Server unreachable"); throw e; };
 
+export const fetchOrganizations = async () => {
+    try { const r = await api.get("/organizations"); return r.data; } catch (e) { O(e); }
+};
 export const fetchOrganization = async (slug) => {
-    const response = await api.get(`/organizations/${slug}`);
-    return response.data;
+    try { const r = await api.get(`/organizations/${slug}`); return r.data; } catch (e) { O(e); }
 };
-
 export const fetchOrganizationMembers = async (slug) => {
-    const response = await api.get(`/organizations/${slug}/members`);
-    return response.data;
+    try { const r = await api.get(`/organizations/${slug}/members`); return r.data; } catch (e) { O(e); }
 };
-
+export const createOrganization = async (data) => {
+    try { const r = await api.post("/organizations", data); return r.data; } catch (e) { O(e); }
+};
 export const addOrganizationMember = async (slug, data) => {
-    const response = await api.post(`/organizations/${slug}/members`, data);
-    return response.data;
+    try { const r = await api.post(`/organizations/${slug}/members`, data); return r.data; } catch (e) { O(e); }
 };
-
 export const removeOrganizationMember = async (slug, userId) => {
-    const response = await api.delete(`/organizations/${slug}/members/${userId}`);
-    return response.data;
+    try { const r = await api.delete(`/organizations/${slug}/members/${userId}`); return r.data; } catch (e) { O(e); }
 };

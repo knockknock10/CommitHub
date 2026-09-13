@@ -1,26 +1,17 @@
 import api from "./axios";
 
 export const fetchNotifications = async (params = {}) => {
-    const { data } = await api.get("/notifications", { params });
-    return data;
+    try { const { data } = await api.get("/notifications", { params }); return data; } catch (e) { if (e && e.offline) throw new Error("Server unreachable"); throw e; }
 };
-
 export const fetchUnreadCount = async () => {
-    const { data } = await api.get("/notifications/unread-count");
-    return data;
+    try { const { data } = await api.get("/notifications/unread-count"); return data; } catch (e) { if (e && e.offline) throw new Error("Server unreachable"); throw e; }
 };
-
 export const markNotificationRead = async (id) => {
-    const { data } = await api.patch(`/notifications/${id}/read`);
-    return data;
+    try { const { data } = await api.patch(`/notifications/${id}/read`); return data; } catch (e) { if (e && e.offline) throw new Error("Server unreachable"); throw e; }
 };
-
 export const markAllNotificationsRead = async () => {
-    const { data } = await api.patch("/notifications/read-all");
-    return data;
+    try { const { data } = await api.patch("/notifications/read-all"); return data; } catch (e) { if (e && e.offline) throw new Error("Server unreachable"); throw e; }
 };
-
 export const deleteNotification = async (id) => {
-    const { data } = await api.delete(`/notifications/${id}`);
-    return data;
+    try { const { data } = await api.delete(`/notifications/${id}`); return data; } catch (e) { if (e && e.offline) throw new Error("Server unreachable"); throw e; }
 };
