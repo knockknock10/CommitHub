@@ -1,0 +1,311 @@
+/* ============================================================================
+   Auth pages — Login & Signup
+   Split layout: brand + feature list left, form card right.
+   Dark, clean, CommitHub-branded.
+   ============================================================================ */
+
+.ch-auth-page {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    min-height: 100vh;
+    background: #0d1117;
+}
+
+.ch-auth-left {
+    display: flex;
+    flex-direction: column;
+    padding: 48px;
+    background: linear-gradient(160deg, #0d1117 0%, #161b22 100%);
+    border-right: 1px solid rgba(48, 54, 63, 0.6);
+    overflow: hidden;
+    position: relative;
+}
+
+.ch-auth-left::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.025'/%3E%3C/svg%3E");
+    pointer-events: none;
+    opacity: 0.5;
+}
+
+.ch-auth-brand {
+    position: relative;
+    z-index: 1;
+    margin-bottom: 64px;
+}
+
+.ch-auth-mark {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 18px;
+    font-weight: 600;
+    color: #f0f6fc;
+    text-decoration: none;
+    letter-spacing: -0.01em;
+}
+
+.ch-auth-mark svg {
+    color: #58a6ff;
+}
+
+.ch-auth-left-content {
+    position: relative;
+    z-index: 1;
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.ch-auth-left-title {
+    font-size: clamp(36px, 5vw, 48px);
+    font-weight: 700;
+    color: #f0f6fc;
+    letter-spacing: -0.03em;
+    line-height: 1.1;
+    margin: 0 0 16px;
+}
+
+.ch-auth-left-desc {
+    font-size: 16px;
+    color: #8b949e;
+    line-height: 1.6;
+    margin: 0 0 40px;
+    max-width: 420px;
+}
+
+.ch-auth-features {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+.ch-auth-feature {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 14px;
+    color: #8b949e;
+    line-height: 1.4;
+}
+
+.ch-auth-feature svg {
+    flex-shrink: 0;
+    color: #3fb950;
+}
+
+/* Card */
+
+.ch-auth-right {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 48px;
+    background: #0d1117;
+}
+
+.ch-auth-card {
+    width: 100%;
+    max-width: 420px;
+}
+
+.ch-auth-tabs {
+    display: flex;
+    gap: 0;
+    border-bottom: 1px solid rgba(48, 54, 63, 0.6);
+    margin-bottom: 28px;
+}
+
+.ch-auth-tab {
+    flex: 1;
+    padding: 12px 16px;
+    font-size: 15px;
+    font-weight: 500;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: #8b949e;
+    cursor: pointer;
+    transition: all 150ms ease;
+    font-family: inherit;
+    margin-bottom: -1px;
+}
+
+.ch-auth-tab:hover {
+    color: #e6edf3;
+}
+
+.ch-auth-tab-active {
+    color: #58a6ff;
+    border-bottom-color: #58a6ff;
+}
+
+/* Form */
+
+.ch-auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.ch-auth-form-error {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 12px;
+    background: rgba(248, 81, 73, 0.1);
+    border: 1px solid rgba(248, 81, 73, 0.3);
+    border-radius: 6px;
+    color: #f85149;
+    font-size: 13px;
+}
+
+.ch-form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.ch-form-label {
+    font-size: 13px;
+    font-weight: 500;
+    color: #8b949e;
+    letter-spacing: 0.01em;
+}
+
+.ch-form-input {
+    width: 100%;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-family: inherit;
+    background: #0d1117;
+    border: 1px solid rgba(48, 54, 63, 0.8);
+    border-radius: 6px;
+    color: #f0f6fc;
+    outline: none;
+    transition: all 150ms ease;
+}
+
+.ch-form-input::placeholder {
+    color: #484f58;
+}
+
+.ch-form-input:focus {
+    outline: none;
+    border-color: #58a6ff;
+    box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.15);
+}
+
+.ch-form-input-err {
+    border-color: #f85149 !important;
+    box-shadow: 0 0 0 3px rgba(248, 81, 73, 0.12) !important;
+}
+
+.ch-form-err-inline {
+    font-size: 12px;
+    color: #f85149;
+}
+
+.ch-form-err {
+    color: #f85149;
+    font-size: 12px;
+    margin-left: 4px;
+}
+
+.ch-auth-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 12px 20px;
+    font-size: 15px;
+    font-weight: 500;
+    font-family: inherit;
+    background: #238636;
+    color: #ffffff;
+    border: none;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 150ms ease;
+    margin-top: 4px;
+}
+
+.ch-auth-btn:hover:not(:disabled) {
+    background: #2ea043;
+    color: #ffffff;
+}
+
+.ch-auth-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.ch-auth-demo {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #6e7681;
+    background: rgba(56, 62, 75, 0.3);
+    padding: 8px 10px;
+    border-radius: 6px;
+    border: 1px solid rgba(48, 54, 63, 0.5);
+    align-self: flex-start;
+}
+
+.ch-auth-demo-code {
+    font-family: 'JetBrains Mono', monospace;
+    color: #58a6ff;
+    font-size: 12px;
+}
+
+.ch-auth-terms {
+    font-size: 12px;
+    color: #6e7681;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.ch-auth-terms-link {
+    color: #58a6ff;
+    text-decoration: none;
+}
+
+.ch-auth-terms-link:hover {
+    text-decoration: underline;
+}
+
+/* Responsive */
+
+@media (max-width: 960px) {
+    .ch-auth-page {
+        grid-template-columns: 1fr;
+    }
+
+    .ch-auth-left {
+        padding: 32px 24px;
+        border-right: none;
+        border-bottom: 1px solid rgba(48, 54, 63, 0.6);
+    }
+
+    .ch-auth-left-content {
+        display: none;
+    }
+
+    .ch-auth-right {
+        padding: 24px;
+    }
+}
+
+@media (max-width: 480px) {
+    .ch-auth-card {
+        max-width: 100%;
+    }
+
+    .ch-auth-features {
+        display: none;
+    }
+}
