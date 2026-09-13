@@ -82,7 +82,7 @@ const Sidebar = ({ isOpen, onNavigate }) => {
                 title="CommitHub"
             >
                 <span className="sidebar-logo-mark" aria-hidden="true">
-                    ◉
+
                 </span>
                 <span className="sidebar-logo-name">CommitHub</span>
             </div>

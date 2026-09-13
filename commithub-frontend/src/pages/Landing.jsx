@@ -1,26 +1,24 @@
 import Navbar from "../components/landing/Navbar";
 import Hero from "../components/landing/Hero";
 import Features from "../components/landing/Features";
-import CLIWorkflow from "../components/landing/CLIWorkflow";
-import RepositoryPreview from "../components/landing/RepositoryPreview";
-import Collaboration from "../components/landing/Collaboration";
-import Discovery from "../components/landing/Discovery";
-import FinalCTA from "../components/landing/FinalCTA";
+import Workflow from "../components/landing/Workflow";
+import RepoPreview from "../components/landing/RepoPreview";
+import Collaborate from "../components/landing/Collaborate";
+import Trust from "../components/landing/Trust";
+import CTA from "../components/landing/CTA";
 import Footer from "../components/landing/Footer";
-
-import "../styles/landing.css";
 
 const Landing = () => {
     return (
-        <div className="landing-page">
+        <div className="ch-landing">
             <Navbar />
             <Hero />
             <Features />
-            <CLIWorkflow />
-            <RepositoryPreview />
-            <Collaboration />
-            <Discovery />
-            <FinalCTA />
+            <Workflow />
+            <RepoPreview />
+            <Collaborate />
+            <Trust />
+            <CTA />
             <Footer />
         </div>
     );

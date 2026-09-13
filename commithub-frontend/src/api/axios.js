@@ -1,5 +1,12 @@
 import axios from "axios";
 
+class AuthError extends Error {
+    constructor(message) {
+        super(message);
+        this.name = "AuthError";
+    }
+}
+
 const api = axios.create({
     baseURL: import.meta.env.VITE_API_BASE_URL || "",
     headers: {
@@ -9,25 +16,27 @@ const api = axios.create({
     timeoutErrorMessage: "Server unreachable — please check your connection"
 });
 
-/* attach token to all routes except the public auth endpoints (login/signup) */
+/* attach token to all routes except public auth endpoints */
 api.interceptors.request.use(
     (config) => {
         const storedUser = localStorage.getItem("commithub-user");
-        if(storedUser){
-            const user = JSON.parse(storedUser);
-            if(user.token){
-                const url = config.url || "";
-                const isPublicAuthRoute = url.includes("/auth/");
-                if(!isPublicAuthRoute){
-                    config.headers.Authorization = `Bearer ${user.token}`;
+        if (storedUser) {
+            try {
+                const user = JSON.parse(storedUser);
+                if (user.token) {
+                    const url = config.url || "";
+                    const isPublicAuthRoute = url.includes("/auth/") || url.includes("/auth");
+                    if (!isPublicAuthRoute) {
+                        config.headers.Authorization = `Bearer ${user.token}`;
+                    }
                 }
+            } catch (e) {
+                localStorage.removeItem("commithub-user");
             }
         }
         return config;
     },
-    (error) => {
-        return Promise.reject(error);
-    }
+    (error) => Promise.reject(error)
 );
 
 /* handle responses and errors globally */
@@ -46,10 +55,12 @@ api.interceptors.response.use(
 
         switch (status) {
             case 401:
-                // Authentication error - clear user and redirect to login
+                // Token expired or invalid — clear and signal auth error
                 localStorage.removeItem("commithub-user");
-                window.location.href = "/login";
-                break;
+                const authErr = new AuthError(message || "Session expired. Please sign in again.");
+                authErr.status = 401;
+                authErr.redirectTo = "/login";
+                return Promise.reject(authErr);
             case 403:
                 console.error("[Forbidden]:", message);
                 break;
@@ -70,4 +81,5 @@ api.interceptors.response.use(
     }
 );
 
+export { AuthError };
 export default api;

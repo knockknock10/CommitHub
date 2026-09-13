@@ -63,7 +63,7 @@ const Dashboard = () => {
         setReposError("");
         try {
             const data = await fetchRepositories();
-            setRepositories(data);
+            setRepositories(data.repositories || []);
         } catch {
             setReposError("Failed to load repositories");
         } finally {

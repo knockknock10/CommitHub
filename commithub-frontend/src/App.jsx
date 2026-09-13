@@ -130,7 +130,7 @@
 
 // export default App;
 
-import { HashRouter, Routes, Route } from "react-router-dom";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Landing from "./pages/Landing";
 import Home from "./pages/Home";
 import AuthPage from "./pages/AuthPage";
@@ -152,7 +152,11 @@ import ErrorBoundary from "./components/ErrorBoundary";
 import { useAuth } from "./context/AuthContext";
 
 const HomeGate = () => {
-    const { user } = useAuth();
+    const { user, loading } = useAuth();
+
+    if (loading) {
+        return null;
+    }
 
     if (!user) {
         return <Landing />;
@@ -164,7 +168,7 @@ const HomeGate = () => {
 const App = () => {
     return (
         <ErrorBoundary>
-            <HashRouter>
+            <BrowserRouter basename="/CommitHub">
                 <Routes>
                     <Route path="/" element={<HomeGate />} />
                     <Route path="/login" element={<AuthPage />} />
@@ -413,7 +417,7 @@ const App = () => {
                         }
                     />
                 </Routes>
-            </HashRouter>
+            </BrowserRouter>
         </ErrorBoundary>
     );
 };

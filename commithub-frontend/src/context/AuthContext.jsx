@@ -4,6 +4,7 @@ import {
     useEffect,
     useState
 } from "react";
+import api from "../api/axios";
 
 const AuthContext = createContext();
 
@@ -13,19 +14,28 @@ export const AuthProvider = ({ children }) => {
 
     useEffect(() => {
         const storedUser = localStorage.getItem("commithub-user");
-
         if (storedUser) {
-            const parsed = JSON.parse(storedUser);
-            // Normalize legacy shape { token, user: { _id, userName, ... } }
-            // to flat shape { _id, userName, token, ... } so Topbar and
-            // other components that read user._id / user.userName work.
-            if (parsed.user && parsed.user._id) {
-                setUser({ ...parsed.user, token: parsed.token });
-            } else {
-                setUser(parsed);
+            try {
+                const parsed = JSON.parse(storedUser);
+                // Check token is still valid by attempting to decode it
+                if (parsed.token) {
+                    const payload = JSON.parse(atob(parsed.token.split(".")[1]));
+                    // Token expired?
+                    if (payload.exp && payload.exp * 1000 < Date.now()) {
+                        localStorage.removeItem("commithub-user");
+                        setLoading(false);
+                        return;
+                    }
+                }
+                if (parsed.user && parsed.user._id) {
+                    setUser({ ...parsed.user, token: parsed.token });
+                } else {
+                    setUser(parsed);
+                }
+            } catch (e) {
+                localStorage.removeItem("commithub-user");
             }
         }
-
         setLoading(false);
     }, []);
 
@@ -40,7 +50,6 @@ export const AuthProvider = ({ children }) => {
     };
 
     return (
-
         <AuthContext.Provider value={{
                 user,
                 login,

@@ -48,7 +48,12 @@ const SignUp = () => {
         <div className="auth-page">
             <div className="auth-container">
                 <div className="auth-brand">
-                    <div className="auth-logo">◉</div>
+                    <div className="auth-logo">
+                        <svg viewBox="0 0 32 32" fill="none" width="28" height="28" aria-hidden="true">
+                            <path d="M16 4L4 10l12 6 12-6-12-6z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M4 18l12 6 12-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                    </div>
                     <h1 className="auth-title">Create your account</h1>
                 </div>
                 

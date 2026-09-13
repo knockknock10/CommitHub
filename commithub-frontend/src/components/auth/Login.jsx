@@ -22,7 +22,10 @@ const Login = () => {
             setLoading(true);
             setError("");
             const data = await loginUser(formData);
-            login({ ...data.user, token: data.token });
+            // Store in localStorage directly — AuthContext reads from there
+            const userData = data.user || { userName: data.userName, _id: data._id };
+            userData.token = data.token;
+            localStorage.setItem("commithub-user", JSON.stringify(userData));
             navigate("/dashboard");
         } catch (err) {
             setError(err.response?.data?.message || "login failed");
@@ -35,7 +38,12 @@ const Login = () => {
         <div className="auth-page">
             <div className="auth-container">
                 <div className="auth-brand">
-                    <div className="auth-logo">◉</div>
+                    <div className="auth-logo">
+                        <svg viewBox="0 0 32 32" fill="none" width="28" height="28" aria-hidden="true">
+                            <path d="M16 4L4 10l12 6 12-6-12-6z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                            <path d="M4 18l12 6 12-6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        </svg>
+                    </div>
                     <h1 className="auth-title">Sign in to CommitHub</h1>
                 </div>
                 

@@ -9,9 +9,10 @@ export const SocketProvider = ({ children }) => {
     const [connected, setConnected] = useState(false);
 
     useEffect(() => {
-        if (!user) {
-            disconnectSocket();
-            setConnected(false);
+        disconnectSocket();
+        setConnected(false);
+
+        if (!user || !user.token) {
             return;
         }
 
