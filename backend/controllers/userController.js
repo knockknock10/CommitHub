@@ -72,3 +72,29 @@ export const getUserProfile = async (req, res) => {
         });
     }
 };
+
+export const updateUserProfile = async (req, res) => {
+    try {
+        const allowedFields = ["name", "bio", "userName", "email"];
+        const updates = {};
+        for (const field of allowedFields) {
+            if (req.body[field] !== undefined) {
+                updates[field] = req.body[field];
+            }
+        }
+        if (Object.keys(updates).length === 0) {
+            return res.status(400).json({ message: "No valid fields to update" });
+        }
+        const user = await User.findByIdAndUpdate(
+            req.user._id,
+            updates,
+            { new: true, runValidators: true }
+        ).select("-password");
+        if (!user) {
+            return res.status(404).json({ message: "User not found" });
+        }
+        res.status(200).json(user);
+    } catch (err) {
+        res.status(500).json({ message: "Server error" });
+    }
+};
