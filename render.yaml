@@ -1,0 +1,25 @@
+services:
+  - type: web
+    name: commithub-backend
+    runtime: node
+    plan: free
+    region: virginia
+    buildCommand: cd backend && npm install --omit=dev
+    startCommand: cd backend && node server.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 5001
+      - key: MONGO_URI
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: AWS_ACCESS_KEY_ID
+        sync: false
+      - key: AWS_SECRET_ACCESS_KEY
+        sync: false
+      - key: AWS_REGION
+        value: us-east-1
+      - key: S3_BUCKET
+        value: commithub-storage
