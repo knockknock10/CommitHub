@@ -1,55 +1,76 @@
+import { useEffect, useState } from "react";
 import { useParams } from "react-router-dom";
 
 import DashboardLayout from "../components/dashboard/DashboardLayout";
-
+import { fetchRepositoryById, fetchRepositoryTree, fetchRepositoryBranches } from "../api/repositoryApi";
 import "../styles/repositoryDetails.css";
 
-const files = [
-
-    {
-        name: "backend",
-        type: "folder",
-        message: "updated auth controller and repository logic",
-        time: "2 hours ago"
-    },
-
-    {
-        name: "commithub-frontend",
-        type: "folder",
-        message: "added repository dashboard pages",
-        time: "3 hours ago"
-    },
-
-    {
-        name: "Readme.md",
-        type: "file",
-        message: "updated project documentation",
-        time: "yesterday"
-    },
-
-    {
-        name: "package.json",
-        type: "file",
-        message: "added project scripts",
-        time: "2 days ago"
-    },
-
-    {
-        name: "structure.txt",
-        type: "file",
-        message: "added project folder structure",
-        time: "3 days ago"
-    }
-];
-
 const RepositoryDetails = () => {
-
     const { repoName } = useParams();
+    const [repo, setRepo] = useState(null);
+    const [files, setFiles] = useState([]);
+    const [branches, setBranches] = useState([]);
+    const [selectedBranch, setSelectedBranch] = useState("main");
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
+
+    useEffect(() => {
+        const loadRepo = async () => {
+            try {
+                const data = await fetchRepositoryById(repoName);
+                setRepo(data);
+            } catch {
+                setError("Failed to load repository.");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        const loadFiles = async () => {
+            try {
+                const data = await fetchRepositoryTree(repoName);
+                setFiles(data.tree || []);
+            } catch {
+                setError("Failed to load files.");
+            }
+        };
+
+        const loadBranches = async () => {
+            try {
+                const data = await fetchRepositoryBranches(repoName);
+                setBranches(data.branches || []);
+            } catch {
+                setError("Failed to load branches.");
+            }
+        };
+
+        loadRepo();
+        loadFiles();
+        loadBranches();
+    }, [repoName]);
+
+    if (loading || !repo) {
+        return (
+            <DashboardLayout>
+                <div className="shared-loading">
+                    <p>Loading repository...</p>
+                </div>
+            </DashboardLayout>
+        );
+    }
+
+    if (error) {
+        return (
+            <DashboardLayout>
+                <div className="shared-error">
+                    <p>{error}</p>
+                </div>
+            </DashboardLayout>
+        );
+    }
 
     return (
-
         <DashboardLayout>
-
             <div className="repo-details-page">
 
                 <div className="repo-details-header">
@@ -59,7 +80,7 @@ const RepositoryDetails = () => {
                         <div className="repo-path">
 
                             <span>
-                                SanjeevKumar
+                                {repo.owner?.userName || repo.owner || "SanjeevKumar"}
                             </span>
 
                             <span>
@@ -67,32 +88,38 @@ const RepositoryDetails = () => {
                             </span>
 
                             <strong>
-                                {repoName}
+                                {repo.name}
                             </strong>
 
                             <span className="repo-visibility">
-                                public
+                                {repo.visibility}
                             </span>
 
                         </div>
 
                         <p>
-                            Git-inspired repository workspace for managing code, commits, branches, and collaboration.
+                            Git-inspired repository for managing code, commits, streams, and collaboration.
                         </p>
 
                     </div>
 
                     <div className="repo-header-actions">
 
-                        <button>
+                        <button
+                            onClick={() => alert("Watch functionality would trigger here")}
+                        >
                             Watch
                         </button>
 
-                        <button>
+                        <button
+                            onClick={() => alert("Star functionality would trigger here")}
+                        >
                             Star
                         </button>
 
-                        <button>
+                        <button
+                            onClick={() => alert("Fork functionality would trigger here")}
+                        >
                             Fork
                         </button>
 
@@ -111,7 +138,7 @@ const RepositoryDetails = () => {
                     </button>
 
                     <button>
-                        Pull requests
+                        pull requests
                     </button>
 
                     <button>
@@ -131,28 +158,36 @@ const RepositoryDetails = () => {
                 <div className="repo-toolbar">
 
                     <button className="branch-btn">
-                        main
+                        {selectedBranch}
                     </button>
 
                     <div className="repo-toolbar-info">
 
                         <span>
-                            142 commits
+                            {repo?.commits?.length || 142} commits
                         </span>
 
                         <span>
-                            4 branches
+                            {branches.length || 4} streams
                         </span>
 
                         <span>
-                            2 releases
+                            2 versions
                         </span>
 
                     </div>
 
-                    <button className="code-btn">
-                        Code
-                    </button>
+                    <select
+                        value={selectedBranch}
+                        onChange={(e) => setSelectedBranch(e.target.value)}
+                    >
+                        {branches.map((branch) => (
+                            <option key={branch} value={branch}>
+                                {branch}
+                            </option>
+                        ))}
+                        <option value="main">main</option>
+                    </select>
 
                 </div>
 
@@ -161,7 +196,7 @@ const RepositoryDetails = () => {
                     <div>
 
                         <strong>
-                            Sanjeev Kumar
+                            {repo.owner?.userName || "Sanjeev Kumar"}
                         </strong>
 
                         <span>
@@ -182,7 +217,7 @@ const RepositoryDetails = () => {
 
                         <div
                             className="file-row"
-                            key={index}
+                            key={file._id || index}
                         >
 
                             <div className="file-name">
@@ -209,6 +244,12 @@ const RepositoryDetails = () => {
 
                     ))}
 
+                    {files.length === 0 && (
+                        <p className="no-files-found">
+                            No files found.
+                        </p>
+                    )}
+
                 </div>
 
                 <div className="readme-box">
@@ -230,7 +271,7 @@ const RepositoryDetails = () => {
                         </p>
 
                         <p>
-                            This repository contains the frontend and backend structure for authentication, repository management, commits, branches, issues, and AWS S3 based file handling.
+                            This repository contains the frontend and backend structure for authentication, repository management, commits, streams, issues, and AWS S3 based file handling.
                         </p>
 
                         <h3>
@@ -244,7 +285,7 @@ const RepositoryDetails = () => {
                             </li>
 
                             <li>
-                                Commit and branch workflows
+                                Commit and stream workflows
                             </li>
 
                             <li>
@@ -266,7 +307,6 @@ const RepositoryDetails = () => {
                 </div>
 
             </div>
-
         </DashboardLayout>
     );
 };

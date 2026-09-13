@@ -1,1030 +1,203 @@
-import { useCallback, useEffect, useState } from "react";
+import { useEffect, useState } from "react";
+import { Link, useParams } from "react-router-dom";
 import {
-    addPullRequestComment,
-    closePullRequest,
+    CheckIcon,
+    CloseIcon,
+    GitMergeIcon
+} from "../ui/icons";
+import {
     fetchPullRequest,
-    fetchPullRequestMergeStatus,
-    mergePullRequest,
+    closePullRequest,
     reopenPullRequest,
-    submitPullRequestReview,
-    createReviewComment
+    mergePullRequest,
+    addPullRequestComment
 } from "../../api/repositoryApi";
-import PullRequestConflictResolver from "./PullRequestConflictResolver";
-import ReviewCommentPanel from "./ReviewCommentPanel";
-import { useAuth } from "../../context/AuthContext";
+import "../../styles/pullRequestComponents.css";
 
-const shortId = (commitId) =>
-    commitId?.slice(0, 7) || "";
-
-const formatFullDate = (timestamp) =>
-    timestamp
-        ? new Date(timestamp).toLocaleString()
-        : "";
-
-const MERGE_STATE_LABELS = {
-    READY: "Ready to merge",
-    CONFLICTS: "Conflicts",
-    BLOCKED: "Review required",
-    ALREADY_UP_TO_DATE: "Already up to date",
-    ALREADY_MERGED: "Merged",
-    CLOSED: "Closed",
-    INVALID: "Unavailable"
-};
-
-const describeMergeError = (error) => {
-    const status = error.response?.status;
-    const serverMessage = error.response?.data?.message;
-
-    if (status === 409) {
-        if (error.response?.data?.status === "CONFLICTS") {
-            return "This pull request has conflicts and cannot be merged.";
-        }
-
-        return serverMessage || "This pull request has already been merged.";
-    }
-
-    if (status === 400) {
-        if (serverMessage && serverMessage.includes("closed")) {
-            return "This pull request is closed.";
-        }
-
-        return serverMessage || "This pull request cannot be merged.";
-    }
-
-    if (status === 401 || status === 403) {
-        return "You are not authorized to merge this pull request.";
-    }
-
-    if (status === 404) {
-        return "Pull request not found.";
-    }
-
-    if (status === 422) {
-        return serverMessage || "The merge request could not be processed.";
-    }
-
-    return serverMessage || "Failed to merge pull request";
-};
-
-const PullRequestDetails = ({
-    repository,
-    isOwner,
-    number,
-    onBack
-}) => {
-    const [pullRequest, setPullRequest] = useState(null);
+const PullRequestDetails = ({ repository, isOwner }) => {
+    const { number } = useParams();
+    const [pr, setPr] = useState(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState("");
-    const [message, setMessage] = useState("");
-    const [messageType, setMessageType] = useState("");
     const [comment, setComment] = useState("");
-    const [submitting, setSubmitting] = useState(false);
-    const [reviewState, setReviewState] = useState("");
-    const [reviewComment, setReviewComment] = useState("");
-    const [reviewing, setReviewing] = useState(false);
-    const [expandedFile, setExpandedFile] = useState(null);
-    const [mergeStatus, setMergeStatus] = useState(null);
-    const [statusLoading, setStatusLoading] = useState(true);
-    const [statusError, setStatusError] = useState("");
-    const [merging, setMerging] = useState(false);
-    const [commentTarget, setCommentTarget] = useState(null);
-    const [inlineComment, setInlineComment] = useState("");
-    const [inlineSubmitting, setInlineSubmitting] = useState(false);
-    const { user } = useAuth();
+    const [busy, setBusy] = useState(false);
+    const [posting, setPosting] = useState(false);
+    const [actionError, setActionError] = useState("");
 
-    const load = useCallback(async (silent = false) => {
-        if (!silent) {
-            setLoading(true);
-        }
+    const loadPR = async () => {
+        setLoading(true);
         setError("");
-
         try {
-            const data = await fetchPullRequest(
-                repository._id,
-                number
-            );
-            setPullRequest(data);
-        } catch (error) {
-            setError(
-                error.response?.data?.message ||
-                "Failed to load pull request"
-            );
+            const data = await fetchPullRequest(repository._id, number);
+            setPr(data);
+        } catch (err) {
+            setError(err.response?.data?.message || "Failed to load pull request.");
         } finally {
-            if (!silent) {
-                setLoading(false);
-            }
+            setLoading(false);
         }
-    }, [repository._id, number]);
-
-    const loadMergeStatus = useCallback(async () => {
-        setStatusLoading(true);
-        setStatusError("");
-
-        try {
-            const data = await fetchPullRequestMergeStatus(
-                repository._id,
-                number
-            );
-            setMergeStatus(data);
-        } catch (error) {
-            setStatusError(
-                error.response?.data?.message ||
-                "Failed to load merge status"
-            );
-        } finally {
-            setStatusLoading(false);
-        }
-    }, [repository._id, number]);
+    };
 
     useEffect(() => {
-        load();
-        loadMergeStatus();
-    }, [load, loadMergeStatus]);
+        loadPR();
+    }, [repository._id, number]);
 
-    const refresh = async () => {
-        await Promise.all([load(true), loadMergeStatus()]);
-    };
-
-    const handleComment = async () => {
-        if (comment.trim() === "") {
-            setMessageType("error");
-            setMessage("Comment content is required");
-            return;
-        }
-
-        setSubmitting(true);
-        setMessage("");
-        setMessageType("");
-
+    const handleStatusToggle = async () => {
+        setBusy(true);
+        setActionError("");
         try {
-            await addPullRequestComment(
-                repository._id,
-                number,
-                { content: comment.trim() }
-            );
-            setComment("");
-            await refresh();
-        } catch (error) {
-            setMessageType("error");
-            setMessage(
-                error.response?.data?.message ||
-                "Failed to add comment"
-            );
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    const handleReview = async () => {
-        if (reviewState === "") {
-            setMessageType("error");
-            setMessage("Review state is required");
-            return;
-        }
-
-        setSubmitting(true);
-        setMessage("");
-        setMessageType("");
-
-        try {
-            await submitPullRequestReview(
-                repository._id,
-                number,
-                {
-                    state: reviewState,
-                    comment: reviewComment.trim()
-                }
-            );
-            setReviewState("");
-            setReviewComment("");
-            setReviewing(false);
-            await refresh();
-        } catch (error) {
-            setMessageType("error");
-            setMessage(
-                error.response?.data?.message ||
-                "Failed to submit review"
-            );
-        } finally {
-            setSubmitting(false);
-        }
-    };
-
-    const handleAction = async (action) => {
-        setSubmitting(true);
-        setMessage("");
-        setMessageType("");
-
-        try {
-            if (action === "close") {
+            if (pr.status === "open") {
                 await closePullRequest(repository._id, number);
-            } else if (action === "reopen") {
+            } else {
                 await reopenPullRequest(repository._id, number);
             }
-            setMessageType("success");
-            setMessage("Pull request updated");
-            await refresh();
-        } catch (error) {
-            setMessageType("error");
-            setMessage(
-                error.response?.data?.message ||
-                "Action failed"
-            );
+            await loadPR();
+        } catch (err) {
+            setActionError(err.response?.data?.message || "Failed to update pull request.");
         } finally {
-            setSubmitting(false);
+            setBusy(false);
         }
     };
 
     const handleMerge = async () => {
-        if (merging) {
-            return;
-        }
-
-        setMerging(true);
-        setMessage("");
-        setMessageType("");
-
+        setBusy(true);
+        setActionError("");
         try {
-            const result = await mergePullRequest(
-                repository._id,
-                number
-            );
-            setMessageType("success");
-            setMessage(result.message || "Pull request merged");
-            await refresh();
-        } catch (error) {
-            setMessageType("error");
-            setMessage(describeMergeError(error));
-            await refresh();
+            await mergePullRequest(repository._id, number);
+            await loadPR();
+        } catch (err) {
+            setActionError(err.response?.data?.message || "Failed to merge pull request.");
         } finally {
-            setMerging(false);
+            setBusy(false);
         }
     };
 
-    const handleInlineComment = async () => {
-        if (!inlineComment.trim() || !commentTarget) return;
-
-        setInlineSubmitting(true);
+    const handleCommentSubmit = async () => {
+        if (!comment.trim()) return;
+        setPosting(true);
+        setActionError("");
         try {
-            await createReviewComment(
-                repository._id,
-                number,
-                {
-                    body: inlineComment.trim(),
-                    commit: commentTarget.commit,
-                    filePath: commentTarget.filePath,
-                    line: commentTarget.line
-                }
-            );
-            setInlineComment("");
-            setCommentTarget(null);
-            await refresh();
-        } catch (error) {
-            setMessageType("error");
-            setMessage(
-                error.response?.data?.message ||
-                "Failed to post comment"
-            );
+            await addPullRequestComment(repository._id, number, {
+                content: comment
+            });
+            setComment("");
+            await loadPR();
+        } catch (err) {
+            setActionError(err.response?.data?.message || "Failed to post comment.");
         } finally {
-            setInlineSubmitting(false);
+            setPosting(false);
         }
     };
 
-    if (loading) {
-        return (
-            <div className="pull-request-detail">
-                <button
-                    className="file-viewer-back"
-                    onClick={onBack}
-                >
-                    Back to pull requests
-                </button>
-                <p>Loading pull request...</p>
-            </div>
-        );
-    }
+    if (loading) return <div className="shared-loading"><p>Loading pull request...</p></div>;
+    if (error && !pr) return <div className="shared-error"><p>{error}</p><button className="state-btn" onClick={loadPR}>Retry</button></div>;
+    if (!pr) return <div className="shared-error"><p>Pull request not found.</p></div>;
 
-    if (error) {
-        return (
-            <div className="pull-request-detail">
-                <button
-                    className="file-viewer-back"
-                    onClick={onBack}
-                >
-                    Back to pull requests
-                </button>
-                <p className="commit-error">{error}</p>
-            </div>
-        );
-    }
-
-    const diff = pullRequest.diff;
-    const isOpen = pullRequest.status === "open";
-    const isMerged = pullRequest.status === "merged";
-    const reviewStates = ["approved", "changes_requested", "commented"];
-    /* the backend rejects self-reviews; hide the controls to match */
-    const canReview =
-        isOpen &&
-        user !== null &&
-        pullRequest.author?._id !== undefined &&
-        pullRequest.author._id !== user._id;
-
-    const changedFiles = diff?.files || [];
-    const totalAdditions = changedFiles.reduce(
-        (sum, file) => sum + (file.additions || 0),
-        0
-    );
-    const totalDeletions = changedFiles.reduce(
-        (sum, file) => sum + (file.deletions || 0),
-        0
-    );
-
-    const mergeState = mergeStatus?.status || "";
-    const mergeStateLabel =
-        MERGE_STATE_LABELS[mergeState] || "Unavailable";
-    const mergeAvailable =
-        isOwner &&
-        isOpen &&
-        mergeStatus !== null &&
-        mergeStatus.mergeable === true;
-    const isOutOfDate = (mergeStatus?.behind || 0) > 0;
-
-    const mergeSummary = () => {
-        if (!mergeStatus) {
-            return "";
-        }
-
-        switch (mergeStatus.status) {
-            case "READY":
-                return mergeStatus.fastForward
-                    ? "No conflicts with the target branch. Merging will fast-forward the target branch."
-                    : "No conflicts with the target branch.";
-            case "BLOCKED":
-                return "Branch protection requirements are not satisfied yet.";
-            case "CONFLICTS":
-                return "This pull request cannot be merged automatically.";
-            case "ALREADY_UP_TO_DATE":
-                return "The source branch has no new commits to merge.";
-            case "ALREADY_MERGED":
-                return "This pull request has already been merged.";
-            case "CLOSED":
-                return "This pull request is closed.";
-            case "INVALID":
-                if (mergeStatus.sourceBranchExists === false) {
-                    return `The source branch "${mergeStatus.sourceBranch}" no longer exists.`;
-                }
-                if (mergeStatus.targetBranchExists === false) {
-                    return `The target branch "${mergeStatus.targetBranch}" no longer exists.`;
-                }
-                return "Merge status is unavailable.";
-            default:
-                return "Merge status is unavailable.";
-        }
-    };
+    const author = pr.author?.userName || "Unknown";
+    const isOpen = pr.status === "open";
 
     return (
-        <div className="pull-request-detail">
-            <button
-                className="file-viewer-back"
-                onClick={onBack}
-            >
-                Back to pull requests
-            </button>
-
-            <div className="pull-request-detail-header">
-                <div className="pull-request-detail-title-row">
-                    <h3>
-                        #{pullRequest.number} {pullRequest.title}
-                    </h3>
-                    <span
-                        className={`pull-request-state ${pullRequest.status}`}
-                    >
-                        {pullRequest.status}
-                    </span>
+        <div className="gh-pr-details">
+            <div className="gh-pr-header">
+                <div className="gh-pr-header-title">
+                    <h1 className="gh-pr-title">#{pr.number} {pr.title}</h1>
+                    <div className="gh-pr-header-meta">
+                        <span className="gh-pr-meta-item">
+                            <Link to={`/profile/${pr.author?._id}`} className="repo-link">{author}</Link>
+                            {" "}wants to merge <span className="mono">{pr.sourceBranch}</span> into{" "}
+                            <span className="mono">{pr.targetBranch}</span>
+                        </span>
+                    </div>
                 </div>
-                <p>
-                    {pullRequest.sourceBranch} →{" "}
-                    {pullRequest.targetBranch}
-                </p>
-                <p>
-                    Opened by {pullRequest.author?.userName || "Unknown"}{" "}
-                    on {formatFullDate(pullRequest.createdAt)}
-                </p>
-                {isMerged && (
-                    <p>
-                        Merged by {pullRequest.mergedBy?.userName ||
-                            "Unknown"} on{" "}
-                        {formatFullDate(pullRequest.mergedAt)}
-                    </p>
-                )}
-                {pullRequest.description && (
-                    <p className="pull-request-description">
-                        {pullRequest.description}
-                    </p>
-                )}
-                {isMerged && (
-                    <p className="pull-request-merge-commit">
-                        Merge commit: {shortId(
-                            pullRequest.mergeCommitId
-                        )}
-                    </p>
-                )}
-            </div>
-
-            {message && (
-                <p className={`commit-message ${messageType}`}>
-                    {message}
-                </p>
-            )}
-
-            <div className="pull-request-section">
-                <h4>Merge status</h4>
-                {statusLoading && !mergeStatus ? (
-                    <p className="commit-empty">
-                        Checking merge status...
-                    </p>
-                ) : statusError && !mergeStatus ? (
-                    <div className="merge-status-error">
-                        <p className="commit-error">{statusError}</p>
-                        <button
-                            className="pull-request-review-btn"
-                            onClick={loadMergeStatus}
-                        >
-                            Retry
+                <div className="gh-pr-header-actions">
+                    <button className={`gh-pr-status-btn ${pr.status}`}>{pr.status}</button>
+                    {isOwner && isOpen && (
+                        <button className="gh-pr-merge-btn" onClick={handleMerge} disabled={busy}>
+                            <GitMergeIcon size={14} /> Merge pull request
                         </button>
-                    </div>
-                ) : (
-                    <div
-                        className={`merge-status-card ${
-                            mergeState.toLowerCase() ||
-                            "unavailable"
-                        }`}
-                    >
-                        <div className="merge-status-head">
-                            <span
-                                className={`merge-state-badge ${
-                                    mergeState.toLowerCase() ||
-                                    "unavailable"
-                                }`}
-                            >
-                                {mergeStateLabel}
-                            </span>
-                            <span className="merge-status-branches">
-                                {pullRequest.sourceBranch} →{" "}
-                                {pullRequest.targetBranch}
-                            </span>
-                            <button
-                                className="merge-refresh-btn"
-                                onClick={loadMergeStatus}
-                                disabled={statusLoading || merging}
-                            >
-                                {statusLoading
-                                    ? "Refreshing..."
-                                    : "Refresh status"}
-                            </button>
-                        </div>
-                        <p className="merge-status-summary">
-                            {mergeSummary()}
-                        </p>
-                        <div className="merge-meta">
-                            <span>
-                                {mergeStatus.ahead || 0} commit
-                                {(mergeStatus.ahead || 0) === 1
-                                    ? ""
-                                    : "s"}{" "}
-                                ahead
-                            </span>
-                            <span>
-                                {mergeStatus.behind || 0} behind
-                            </span>
-                            <span>
-                                {changedFiles.length} file
-                                {changedFiles.length === 1 ? "" : "s"}{" "}
-                                changed
-                            </span>
-                            <span className="merge-meta-additions">
-                                +{totalAdditions}
-                            </span>
-                            <span className="merge-meta-deletions">
-                                -{totalDeletions}
-                            </span>
-                        </div>
-                        {isOutOfDate && isOpen && (
-                            <div className="merge-outdated">
-                                This pull request is out of date with
-                                the target branch. Refresh the merge
-                                status to re-check mergeability.
-                            </div>
-                        )}
-                        {mergeStatus.branchProtection && (
-                            <div className="protection-panel">
-                                <h5>Branch protection</h5>
-                                <p className="protection-summary">
-                                    {mergeStatus.reviewRequirements.approvalsReceived}{" "}
-                                    approval
-                                    {(mergeStatus.reviewRequirements.approvalsReceived) === 1
-                                        ? ""
-                                        : "s"}{" "}
-                                    received ·{" "}
-                                    {mergeStatus.reviewRequirements.requiredApprovals}{" "}
-                                    required
-                                    {mergeStatus.reviewRequirements.staleReviews > 0 && (
-                                        <>
-                                            {" "}·{" "}
-                                            {mergeStatus.reviewRequirements.staleReviews}{" "}
-                                            stale
-                                        </>
-                                    )}
-                                </p>
-                                {mergeStatus.reviewRequirements.satisfied && !mergeStatus.hasConflicts ? (
-                                    <p className="protection-satisfied">
-                                        All review requirements are satisfied.
-                                    </p>
-                                ) : (
-                                    <ul className="merge-block-reasons">
-                                        {(mergeStatus.blockReasons || []).map(
-                                            (reason) => (
-                                                <li key={reason.code}>
-                                                    <span className="block-reason-code">
-                                                        {reason.code}
-                                                    </span>
-                                                    <span className="block-reason-message">
-                                                        {reason.message}
-                                                    </span>
-                                                </li>
-                                            )
-                                        )}
-                                    </ul>
-                                )}
-                            </div>
-                        )}
-                        {mergeStatus.hasConflicts &&
-                            (mergeStatus.conflicts || []).length > 0 && (
-                                <div className="merge-conflicts">
-                                    <h5>Conflicts</h5>
-                                    <p className="merge-conflicts-hint">
-                                        The following files conflict and
-                                        must be resolved before this pull
-                                        request can be merged:
-                                    </p>
-                                    <ul>
-                                        {(mergeStatus.conflicts || []).map(
-                                            (conflict) => (
-                                                <li
-                                                    key={conflict.path}
-                                                    className="merge-conflict-file"
-                                                >
-                                                    <span className="merge-conflict-path">
-                                                        {conflict.path}
-                                                    </span>
-                                                    {conflict.message && (
-                                                        <span className="merge-conflict-reason">
-                                                            {conflict.message}
-                                                        </span>
-                                                    )}
-                                                </li>
-                                            )
-                                        )}
-                                    </ul>
-                                </div>
-                            )}
-                        {isMerged && mergeStatus.mergeCommitId && (
-                            <p className="pull-request-merge-commit">
-                                Merge commit:{" "}
-                                {shortId(mergeStatus.mergeCommitId)} on{" "}
-                                {formatFullDate(
-                                    mergeStatus.mergedAt ||
-                                    pullRequest.mergedAt
-                                )}
-                            </p>
-                        )}
-                    </div>
-                )}
-                {isOwner &&
-                    isOpen &&
-                    mergeStatus !== null &&
-                    mergeStatus.hasConflicts &&
-                    (mergeStatus.conflicts || []).length > 0 && (
-                        <PullRequestConflictResolver
-                            repositoryId={repository._id}
-                            pullRequest={pullRequest}
-                            conflicts={mergeStatus.conflicts}
-                            onResolved={refresh}
-                        />
                     )}
-                {mergeAvailable && (
-                    <div className="pull-request-actions">
-                        <button
-                            className="commit-submit-btn"
-                            onClick={handleMerge}
-                            disabled={merging || submitting}
-                        >
-                            {merging
-                                ? "Merging..."
-                                : "Merge pull request"}
+                    {isOwner && (
+                        <button className="gh-pr-close-btn" onClick={handleStatusToggle} disabled={busy}>
+                            {isOpen
+                                ? <><CloseIcon size={14} /> Close</>
+                                : <><CheckIcon size={14} /> Reopen</>}
                         </button>
-                    </div>
-                )}
-            </div>
-
-            {isOpen && (
-                <div className="pull-request-actions">
-                    <button
-                        className="repo-danger-btn"
-                        onClick={() => handleAction("close")}
-                        disabled={submitting || merging}
-                    >
-                        Close
-                    </button>
-                </div>
-            )}
-
-            {!isOpen && !isMerged && (
-                <button
-                    className="pull-request-reopen-btn"
-                    onClick={() => handleAction("reopen")}
-                    disabled={submitting}
-                >
-                    Reopen
-                </button>
-            )}
-
-            <div className="pull-request-section">
-                <h4>
-                    Commits ({pullRequest.commits?.length || 0})
-                </h4>
-                {(!pullRequest.commits ||
-                    pullRequest.commits.length === 0) && (
-                    <p className="commit-empty">No commits.</p>
-                )}
-                <div className="commit-list">
-                    {(pullRequest.commits || []).map((commit) => (
-                        <div
-                            key={commit.id}
-                            className="commit-row"
-                        >
-                            <div className="commit-row-main">
-                                <span className="commit-row-id">
-                                    {shortId(commit.id)}
-                                </span>
-                                <span className="commit-row-message">
-                                    {commit.message}
-                                </span>
-                            </div>
-                            <div className="commit-row-meta">
-                                <span>{commit.author || "Unknown"}</span>
-                                <span>
-                                    {formatFullDate(commit.timestamp)}
-                                </span>
-                            </div>
-                        </div>
-                    ))}
+                    )}
                 </div>
             </div>
 
-            <div className="pull-request-section">
-                <h4>Files changed ({changedFiles.length})</h4>
-                {diff && (
-                    <p className="commit-change-summary">
-                        {diff.stats?.added || 0} added ·{" "}
-                        {diff.stats?.deleted || 0} deleted ·{" "}
-                        {diff.stats?.modified || 0} modified ·{" "}
-                        +{totalAdditions} -{totalDeletions} lines
-                    </p>
-                )}
-                {changedFiles.map((file) => (
-                    <div key={file.path} className="diff-file">
-                        <div className="diff-file-header">
-                            <button
-                                className="diff-file-toggle"
-                                onClick={() =>
-                                    setExpandedFile(
-                                        expandedFile === file.path
-                                            ? null
-                                            : file.path
-                                    )
-                                }
-                            >
-                                <span
-                                    className={`commit-status commit-status-${file.status.toLowerCase()}`}
-                                >
-                                    {file.status}
-                                </span>
-                                <span className="commit-file-path">
-                                    {file.path}
-                                </span>
-                                {file.approximate && (
-                                    <span className="diff-approximate">
-                                        (approximate)
-                                    </span>
-                                )}
-                            </button>
-                            {!file.binary && (
-                                <span className="diff-file-stats">
-                                    +{file.additions || 0} -{file.deletions || 0}
-                                </span>
-                            )}
-                            {isOpen && !file.binary && (
-                                <button
-                                    className="diff-comment-file-btn"
-                                    onClick={() =>
-                                        setCommentTarget(
-                                            commentTarget?.filePath === file.path
-                                                ? null
-                                                : {
-                                                    filePath: file.path,
-                                                    commit:
-                                                        pullRequest.commits?.[0]?.id ||
-                                                        commitId,
-                                                    line: null
-                                                }
-                                        )
-                                    }
-                                >
-                                    Comment
-                                </button>
-                            )}
+            {actionError && <div className="shared-error"><p>{actionError}</p></div>}
+
+            <div className="gh-pr-main">
+                <div className="gh-pr-conversation">
+                    <div className="gh-pr-timeline">
+                        <div className="gh-pr-event main-event">
+                            <div className="gh-pr-event-header">
+                                <div className="gh-pr-event-user">
+                                    <div className="gh-avatar">{author[0]?.toUpperCase()}</div>
+                                    <span className="gh-user-name">{author}</span>
+                                    <span className="gh-event-action">opened this pull request</span>
+                                    <span className="gh-event-time">{new Date(pr.createdAt).toLocaleDateString()}</span>
+                            </div>
                         </div>
-                        {commentTarget?.filePath === file.path &&
-                            commentTarget.line === null && (
-                                <div className="diff-inline-comment-form">
-                                    <textarea
-                                        className="pull-request-description-input"
-                                        placeholder="Leave a comment on this file..."
-                                        value={inlineComment}
-                                        onChange={(e) =>
-                                            setInlineComment(e.target.value)
-                                        }
-                                        rows={3}
-                                    />
-                                    <div className="review-reply-actions">
-                                        <button
-                                            className="commit-submit-btn"
-                                            onClick={handleInlineComment}
-                                            disabled={
-                                                inlineSubmitting ||
-                                                !inlineComment.trim()
-                                            }
-                                        >
-                                            {inlineSubmitting
-                                                ? "Posting..."
-                                                : "Comment"}
-                                        </button>
-                                        <button
-                                            className="repo-danger-cancel"
-                                            onClick={() => {
-                                                setCommentTarget(null);
-                                                setInlineComment("");
-                                            }}
-                                        >
-                                            Cancel
-                                        </button>
+                            <div className="gh-pr-event-body">
+                                <p>{pr.description || "No description provided."}</p>
+                            </div>
+                        </div>
+
+                        {(pr.comments || []).map((c) => (
+                            <div className="gh-pr-comment" key={c._id}>
+                                <div className="gh-pr-comment-header">
+                                    <div className="gh-pr-comment-user">
+                                        <div className="gh-avatar">{c.user?.userName?.[0]?.toUpperCase()}</div>
+                                        <span className="gh-user-name">{c.user?.userName || c.author?.userName || "Unknown"}</span>
+                                        <span className="gh-event-time">{new Date(c.createdAt).toLocaleDateString()}</span>
                                     </div>
                                 </div>
-                            )}
-                        {expandedFile === file.path && (
-                            file.binary ? (
-                                <p className="commit-empty">
-                                    Binary file
-                                </p>
-                            ) : (
-                                <div className="diff-hunks">
-                                    {(file.hunks || []).map(
-                                        (hunk, index) => (
-                                            <div
-                                                key={index}
-                                                className="diff-hunk"
-                                            >
-                                                <div className="diff-hunk-header">
-                                                    @@ -{hunk.oldStart},{hunk.oldLines} +{hunk.newStart},{hunk.newLines} @@
-                                                </div>
-                                                {hunk.lines.map(
-                                                    (line, lineIndex) => {
-                                                        const lineNumber =
-                                                            line.type === "del"
-                                                                ? hunk.oldStart +
-                                                                  lineIndex
-                                                                : line.type === "add"
-                                                                    ? null
-                                                                    : hunk.newStart +
-                                                                      lineIndex;
-                                                        const targetLineNumber =
-                                                            line.type === "add"
-                                                                ? hunk.newStart +
-                                                                  lineIndex
-                                                                : line.type === "del"
-                                                                    ? null
-                                                                    : hunk.newStart +
-                                                                      lineIndex;
-
-                                                        return (
-                                                            <div
-                                                                key={lineIndex}
-                                                                className={`diff-line diff-line-${line.type} ${
-                                                                    commentTarget?.filePath === file.path &&
-                                                                    commentTarget.line === targetLineNumber
-                                                                        ? "diff-line-selected"
-                                                                        : ""
-                                                                }`}
-                                                            >
-                                                                <span className="diff-line-prefix">
-                                                                    {line.type === "add"
-                                                                        ? "+"
-                                                                        : line.type === "del"
-                                                                            ? "-"
-                                                                            : " "}
-                                                                </span>
-                                                                <span className="diff-line-text">
-                                                                    {line.text}
-                                                                </span>
-                                                                {isOpen &&
-                                                                    targetLineNumber != null && (
-                                                                        <button
-                                                                            className="diff-line-comment-btn"
-                                                                            onClick={() =>
-                                                                                setCommentTarget(
-                                                                                    commentTarget?.filePath === file.path &&
-                                                                                    commentTarget.line === targetLineNumber
-                                                                                        ? null
-                                                                                        : {
-                                                                                            filePath: file.path,
-                                                                                            commit:
-                                                                                                pullRequest.commits?.[0]?.id ||
-                                                                                                commitId,
-                                                                                            line: targetLineNumber
-                                                                                        }
-                                                                                )
-                                                                            }
-                                                                        >
-                                                                            +
-                                                                        </button>
-                                                                    )}
-                                                            </div>
-                                                        );
-                                                    }
-                                                )}
-                                            </div>
-                                        )
-                                    )}
-                                </div>
-                            )
-                        )}
-                    </div>
-                ))}
-                {changedFiles.length === 0 && (
-                    <p className="commit-empty">No file changes.</p>
-                )}
-            </div>
-
-            <div className="pull-request-section">
-                <h4>Reviews</h4>
-                {(pullRequest.reviews || []).length === 0 && (
-                    <p className="commit-empty">No reviews yet.</p>
-                )}
-                {(pullRequest.reviews || []).map((review, index) => (
-                    <div key={index} className="review-card">
-                        <div className="review-card-header">
-                            <span className="review-author">
-                                {review.reviewer?.userName || "Unknown"}
-                            </span>
-                            <span
-                                className={`review-state review-state-${review.state}`}
-                            >
-                                {review.state}
-                            </span>
-                            {review.stale && (
-                                <span className="review-stale-badge">
-                                    stale
-                                </span>
-                            )}
-                            <span className="review-date">
-                                {formatFullDate(review.createdAt)}
-                            </span>
-                        </div>
-                        {review.reviewedCommit && (
-                            <p className="review-meta-commit">
-                                Reviewed commit: {shortId(review.reviewedCommit)}
-                            </p>
-                        )}
-                        {review.comment && (
-                            <p className="review-comment">
-                                {review.comment}
-                            </p>
-                        )}
-                    </div>
-                ))}
-                {canReview && (
-                    <div className="review-create">
-                        {!reviewing ? (
-                            <button
-                                className="pull-request-review-btn"
-                                onClick={() => setReviewing(true)}
-                            >
-                                Submit review
-                            </button>
-                        ) : (
-                            <div className="review-create-form">
-                                <div className="review-state-row">
-                                    {reviewStates.map((state) => (
-                                        <button
-                                            key={state}
-                                            className={
-                                                reviewState === state
-                                                    ? "pull-request-filter active"
-                                                    : "pull-request-filter"
-                                            }
-                                            onClick={() =>
-                                                setReviewState(state)
-                                            }
-                                        >
-                                            {state}
-                                        </button>
-                                    ))}
-                                </div>
-                                <textarea
-                                    className="pull-request-description-input"
-                                    placeholder="Review comment"
-                                    value={reviewComment}
-                                    onChange={(e) =>
-                                        setReviewComment(e.target.value)
-                                    }
-                                    maxLength={500}
-                                    rows={3}
-                                />
-                                <div className="review-create-actions">
-                                    <button
-                                        className="commit-submit-btn"
-                                        onClick={handleReview}
-                                        disabled={submitting}
-                                    >
-                                        {submitting
-                                            ? "Submitting..."
-                                            : "Submit review"}
-                                    </button>
-                                    <button
-                                        className="repo-danger-cancel"
-                                        onClick={() => {
-                                            setReviewing(false);
-                                            setReviewState("");
-                                            setReviewComment("");
-                                        }}
-                                    >
-                                        Cancel
-                                    </button>
+                                <div className="gh-pr-comment-body">
+                                    <p>{c.content}</p>
                                 </div>
                             </div>
-                        )}
+                        ))}
                     </div>
-                )}
-            </div>
-
-            <ReviewCommentPanel
-                repositoryId={repository._id}
-                pullRequestNumber={number}
-                isOpen={isOpen}
-                commitId={
-                    pullRequest.commits?.[0]?.id ||
-                    pullRequest.mergeCommitId ||
-                    ""
-                }
-            />
-
-            <div className="pull-request-section">
-                <h4>Comments</h4>
-                {(pullRequest.comments || []).length === 0 && (
-                    <p className="commit-empty">No comments yet.</p>
-                )}
-                {(pullRequest.comments || []).map((item, index) => (
-                    <div key={index} className="review-card">
-                        <div className="review-card-header">
-                            <span className="review-author">
-                                {item.author?.userName || "Unknown"}
-                            </span>
-                            <span className="review-date">
-                                {formatFullDate(item.createdAt)}
-                            </span>
+                    <div className="gh-pr-comment-box">
+                        <div className="gh-comment-box-tabs">
+                            <button className="gh-comment-tab active">Write</button>
                         </div>
-                        <p className="review-comment">{item.content}</p>
-                    </div>
-                ))}
-                {isOpen && (
-                    <div className="comment-create">
                         <textarea
-                            className="pull-request-description-input"
-                            placeholder="Leave a comment"
+                            className="gh-comment-textarea"
+                            placeholder="Leave a comment..."
                             value={comment}
                             onChange={(e) => setComment(e.target.value)}
-                            rows={3}
                         />
-                        <button
-                            className="commit-submit-btn"
-                            onClick={handleComment}
-                            disabled={submitting || comment.trim() === ""}
-                        >
-                            {submitting ? "Posting..." : "Comment"}
-                        </button>
+                        <div className="gh-comment-box-footer">
+                            <button
+                                className="gh-comment-submit"
+                                onClick={handleCommentSubmit}
+                                disabled={posting || !comment.trim()}
+                            >
+                                {posting ? "Posting..." : "Comment"}
+                            </button>
+                        </div>
                     </div>
-                )}
+                </div>
+
+                <aside className="gh-pr-sidebar">
+                    <div className="gh-pr-sidebar-section">
+                        <span className="gh-sidebar-label">Reviewers</span>
+                        <div className="gh-sidebar-content"><span className="gh-sidebar-empty">None</span></div>
+                    </div>
+                    <div className="gh-pr-sidebar-section">
+                        <span className="gh-sidebar-label">Assignees</span>
+                        <div className="gh-sidebar-content"><span className="gh-sidebar-empty">None</span></div>
+                    </div>
+                    <div className="gh-pr-sidebar-section">
+                        <span className="gh-sidebar-label">Branches</span>
+                        <div className="gh-sidebar-content">
+                            <span className="mono">{pr.sourceBranch}</span> →{" "}
+                            <span className="mono">{pr.targetBranch}</span>
+                        </div>
+                    </div>
+                </aside>
             </div>
         </div>
     );

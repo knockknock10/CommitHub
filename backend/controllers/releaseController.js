@@ -2,7 +2,7 @@ import mongoose from "mongoose";
 import Release from "../models/releaseModel.js";
 import Tag from "../models/tagModel.js";
 import PullRequest from "../models/pullRequestModel.js";
-import Issue from "../models/issueMode.js";
+import Issue from "../models/issueModel.js";
 import { authorizeRepository } from "../utils/repoAccess.js";
 import { getRepoRoot } from "../utils/repoStorage.js";
 import {
@@ -14,8 +14,8 @@ import {
 import {
     createNotification,
     buildNotificationMessage
-} from "../utils/notificationService.js";
-import { createActivity } from "../utils/activityService.js";
+} from "../services/notificationService.js";
+import { createActivity } from "../services/activityService.js";
 
 const TITLE_MAX_LENGTH = 200;
 const RELEASE_STATUSES = ["draft", "published"];

@@ -1,57 +1,26 @@
-import "../../styles/navbar.css";
+import { Link } from "react-router-dom";
 
 const Navbar = () => {
-
     return (
-
-        <header className="navbar">
-
-            <div className="navbar-left">
-
-                <h1 className="logo">
-                    CommitHub
-                </h1>
-
+        <header className="gh-nav">
+            <div className="gh-nav-container">
+                <div className="gh-nav-left">
+                    <Link to="/" className="gh-nav-brand">
+                        <span className="gh-nav-logo">◉</span>
+                        <span className="gh-nav-text">CommitHub</span>
+                    </Link>
+                    <nav className="gh-nav-links">
+                        <a href="#product" className="gh-nav-link">Product</a>
+                        <a href="#explore" className="gh-nav-link">Explore</a>
+                        <a href="#organizations" className="gh-nav-link">Organizations</a>
+                        <a href="#open-source" className="gh-nav-link">Open Source</a>
+                    </nav>
+                </div>
+                <div className="gh-nav-right">
+                    <Link to="/login" className="gh-nav-signin">Sign in</Link>
+                    <Link to="/signup" className="gh-nav-signup">Sign up</Link>
+                </div>
             </div>
-
-            <nav className="navbar-center">
-
-                <a href="/">
-                    Features
-                </a>
-
-                <a href="/">
-                    Repositories
-                </a>
-
-                <a href="/">
-                    Collaboration
-                </a>
-
-                <a href="/">
-                    Docs
-                </a>
-
-            </nav>
-
-            <div className="navbar-right">
-
-                <a
-                    href="/login"
-                    className="signin-btn"
-                >
-                    Sign in
-                </a>
-
-                <a
-                    href="/signup"
-                    className="signup-btn"
-                >
-                    Get Started
-                </a>
-
-            </div>
-
         </header>
     );
 };

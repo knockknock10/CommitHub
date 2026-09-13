@@ -1,34 +1,40 @@
+/* ============================================================================
+   Modal — command palette feel
+   ========================================================================== */
+
 .ui-modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.75);
     backdrop-filter: blur(4px);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 2000;
     padding: 20px;
+    animation: overlay-in 120ms var(--ease);
 }
 
 .ui-modal-container {
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 12px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-lg);
     width: 100%;
-    max-width: 600px;
-    max-height: 90vh;
+    max-width: 560px;
+    max-height: 85vh;
     display: flex;
     flex-direction: column;
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
-    animation: modalFadeIn 0.2s ease-out;
+    box-shadow: var(--shadow-lg);
+    outline: none;
+    animation: modal-in 150ms var(--ease);
 }
 
 .ui-modal-header {
-    padding: 16px 24px;
-    border-bottom: 1px solid #30363d;
+    padding: var(--space-lg) var(--space-xl);
+    border-bottom: 1px solid var(--border-subtle);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -36,48 +42,77 @@
 
 .ui-modal-title {
     margin: 0;
-    font-size: 20px;
+    font-size: var(--fs-lg);
     font-weight: 600;
-    color: #f0f6fc;
+    color: var(--text-strong);
+    letter-spacing: -0.02em;
 }
 
 .ui-modal-close {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 28px;
+    height: 28px;
     background: none;
+    border-radius: var(--radius);
     border: none;
-    color: #8b949e;
-    font-size: 28px;
+    color: var(--text-muted);
     cursor: pointer;
-    padding: 0;
-    line-height: 1;
-    transition: color 0.2s ease;
+    transition: all var(--duration-fast) var(--ease);
 }
 
 .ui-modal-close:hover {
-    color: #f0f6fc;
+    color: var(--text-strong);
+    background: var(--surface-active);
 }
 
 .ui-modal-body {
-    padding: 24px;
+    padding: var(--space-xl);
     overflow-y: auto;
-    color: #c9d1d9;
+    color: var(--text);
 }
 
 .ui-modal-footer {
-    padding: 16px 24px;
-    border-top: 1px solid #30363d;
+    padding: var(--space-md) var(--space-xl);
+    border-top: 1px solid var(--border-subtle);
     display: flex;
     justify-content: flex-end;
-    gap: 12px;
+    gap: 8px;
 }
 
-@keyframes modalFadeIn {
-    from { opacity: 0; transform: translateY(-20px); }
-    to { opacity: 1; transform: translateY(0); }
+@keyframes overlay-in {
+    from { opacity: 0; }
+    to { opacity: 1; }
+}
+
+@keyframes modal-in {
+    from {
+        opacity: 0;
+        transform: translateY(8px) scale(0.98);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
 }
 
 @media (max-width: 600px) {
+    .ui-modal-overlay {
+        padding: 12px;
+        align-items: flex-end;
+    }
+
     .ui-modal-container {
         max-width: 100%;
-        max-height: 95vh;
+        max-height: 90vh;
+        border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    }
+
+    .ui-modal-header,
+    .ui-modal-body,
+    .ui-modal-footer {
+        padding-left: var(--space-lg);
+        padding-right: var(--space-lg);
     }
 }

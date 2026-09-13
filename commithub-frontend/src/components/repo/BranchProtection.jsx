@@ -76,7 +76,7 @@ const BranchProtection = ({ repositoryId, branch }) => {
                             checked={enabled}
                             onChange={(e) => setEnabled(e.target.checked)}
                         />
-                        Enable branch protection
+                        Enable stream protection
                     </label>
 
                     {enabled && (

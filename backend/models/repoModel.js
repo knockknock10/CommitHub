@@ -17,7 +17,17 @@ const RepoSchema = new mongoose.Schema({
     owner: {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
-        required: true
+        required: false
+    },
+    organization: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Organization",
+        required: false
+    },
+    upstreamRepository: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Repository",
+        default: null
     },
     stars: {
         type: Number,
@@ -39,6 +49,12 @@ const RepoSchema = new mongoose.Schema({
 }, {
     timestamps: true
 });
+
+/* owner or organization + upstreamRepository: enumerate a repository's direct forks */
+RepoSchema.index({ owner: 1, upstreamRepository: 1, createdAt: -1 });
+RepoSchema.index({ organization: 1, upstreamRepository: 1, createdAt: -1 });
+
+
 
 const Repository = mongoose.model("Repository", RepoSchema);
 

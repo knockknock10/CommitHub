@@ -16,7 +16,11 @@ export const ACTIVITY_TYPES = [
     "PR_REOPENED",
     "TAG_CREATED",
     "RELEASE_PUBLISHED",
-    "REPOSITORY_STARRED"
+    "REPOSITORY_STARRED",
+    "REPOSITORY_FORKED",
+    "COLLABORATOR_ADDED",
+    "COLLABORATOR_UPDATED",
+    "COLLABORATOR_REMOVED"
 ];
 
 const ActivitySchema = new mongoose.Schema(

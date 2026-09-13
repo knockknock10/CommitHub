@@ -56,6 +56,11 @@ const PullRequestSchema = new Schema(
             ref: "Repository",
             required: true
         },
+        sourceRepository: {
+            type: Schema.Types.ObjectId,
+            ref: "Repository",
+            default: null
+        },
         author: {
             type: Schema.Types.ObjectId,
             ref: "User",
@@ -125,6 +130,7 @@ PullRequestSchema.index(
 PullRequestSchema.index(
     {
         repository: 1,
+        sourceRepository: 1,
         sourceBranch: 1,
         targetBranch: 1
     },

@@ -1,7 +1,7 @@
 import Activity, {
     ACTIVITY_TYPES
 } from "../models/activityModel.js";
-import { emitDomainEvent } from "./domainEvents.js";
+import { emitDomainEvent } from "../utils/domainEvents.js";
 import { RT_EVENT } from "../realtime/eventTypes.js";
 
 export { ACTIVITY_TYPES };

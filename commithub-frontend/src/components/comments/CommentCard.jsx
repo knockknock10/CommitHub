@@ -1,4 +1,9 @@
-const CommentCard = ({ comment }) => {
+import { useAuth } from "../../context/AuthContext";
+
+const CommentCard = ({ comment, onDelete }) => {
+
+    const { user } = useAuth();
+    const isAuthor = user?._id === comment.author?._id;
 
     return (
         <div className="comment-card">
@@ -14,6 +19,15 @@ const CommentCard = ({ comment }) => {
                         comment.createdAt
                     ).toLocaleDateString()}
                 </span>
+
+                {isAuthor && onDelete && (
+                    <button
+                        className="comment-delete-btn"
+                        onClick={() => onDelete(comment._id)}
+                    >
+                        Delete
+                    </button>
+                )}
 
             </div>
 

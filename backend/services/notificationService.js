@@ -2,7 +2,7 @@ import User from "../models/userModel.js";
 import Notification, {
     NOTIFICATION_TYPES
 } from "../models/notificationModel.js";
-import { emitDomainEvent } from "./domainEvents.js";
+import { emitDomainEvent } from "../utils/domainEvents.js";
 import { RT_EVENT } from "../realtime/eventTypes.js";
 
 const MENTION_PATTERN = /@([a-zA-Z0-9_]+)/g;

@@ -78,6 +78,7 @@ after(async () => {
     await fs.promises.rm(storageRoot, { recursive: true, force: true });
     server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
+    await mongoose.connection.db.dropDatabase();
     await mongoose.disconnect();
 });
 

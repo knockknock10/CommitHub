@@ -1,97 +1,380 @@
-.topbar{
+/* ============================================================================
+   Topbar — GitHub Professional Dark
+   ========================================================================== */
 
-    height: 80px;
-
-    border-bottom: 1px solid #30363d;
-
-    background: #161b22;
-
+.topbar {
+    height: var(--topbar-h);
     display: flex;
-
     align-items: center;
-
     justify-content: space-between;
-
-    padding: 0 32px;
-}
-
-/* search */
-
-.topbar input{
-
-    width: 340px;
-
-    height: 44px;
-
-    background: #0d1117;
-
-    border: 1px solid #30363d;
-
-    border-radius: 12px;
-
     padding: 0 16px;
-
-    color: white;
-
-    outline: none;
+    background: var(--bg);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+    z-index: 100;
 }
 
-.topbar input:focus{
-
-    border-color: #58a6ff;
-}
-
-/* right */
-
-.topbar-right{
-
+.topbar-left {
     display: flex;
-
     align-items: center;
-
-    gap: 18px;
+    gap: 12px;
+    flex: 1;
+    min-width: 0;
 }
 
-/* button */
+.topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-shrink: 0;
+}
 
-.topbar-right button{
+/* ---- Icons & Buttons --------------------------------------------------- */
 
-    height: 42px;
-
-    padding: 0 18px;
-
+.topbar-icon-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    background: transparent;
     border: none;
+    border-radius: 6px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all var(--duration-fast) var(--ease);
+    flex-shrink: 0;
+}
 
-    border-radius: 10px;
+.topbar-icon-btn:hover {
+    color: var(--text-strong);
+    background: var(--surface-hover);
+}
 
-    background: #238636;
+.topbar-brand {
+    display: none;
+    align-items: center;
+    gap: 8px;
+    text-decoration: none;
+}
 
-    color: white;
+.topbar-brand-mark {
+    color: var(--accent);
+    font-size: 16px;
+}
 
+.topbar-brand-name {
+    font-size: 16px;
     font-weight: 600;
+    color: var(--text-strong);
+}
 
+/* ---- Search ----------------------------------------------------------- */
+
+.search-wrapper {
+    position: relative;
+    display: flex;
+    align-items: center;
+    flex: 1;
+    max-width: 400px;
+}
+
+.search-leading-icon {
+    position: absolute;
+    left: 10px;
+    color: var(--text-faint);
+    pointer-events: none;
+}
+
+.search-wrapper input {
+    width: 100%;
+    height: 32px;
+    padding: 0 70px 0 32px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    color: var(--text-strong);
+    font-size: 14px;
+    outline: none;
+    transition: border-color var(--duration-fast) var(--ease),
+        box-shadow var(--duration-fast) var(--ease);
+}
+
+.search-wrapper input:hover {
+    border-color: var(--border-strong);
+}
+
+.search-wrapper input:focus {
+    border-color: var(--accent);
+    box-shadow: var(--accent-ring);
+}
+
+.search-kbd {
+    position: absolute;
+    right: 10px;
+    font-size: 11px;
+    color: var(--text-muted);
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 5px;
+    pointer-events: none;
+}
+
+.search-btn {
+    position: absolute;
+    right: 2px;
+    height: 26px;
+    padding: 0 8px;
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text-muted);
+    font-size: 12px;
+    font-weight: 500;
     cursor: pointer;
 }
 
-/* profile */
+/* ---- Connection Status ------------------------------------------------ */
 
-.profile{
-
-    width: 42px;
-
-    height: 42px;
-
-    border-radius: 50%;
-
-    background: #2563eb;
-
+.connection-status {
     display: flex;
-
     align-items: center;
+}
 
-    justify-content: center;
+.status-dot {
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    transition: background var(--duration-base) var(--ease);
+}
 
+.status-dot.connected {
+    background: var(--success);
+}
+
+.status-dot.disconnected {
+    background: var(--danger);
+}
+
+/* ---- Notification Bell ------------------------------------------------ */
+
+.notification-wrapper {
+    position: relative;
+}
+
+.notification-bell {
+    position: relative;
+}
+
+.notification-badge {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    background: var(--danger);
     color: white;
+    font-size: 10px;
+    font-weight: 700;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
 
+/* ---- Notification Dropdown -------------------------------------------- */
+
+.notification-dropdown {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 360px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: var(--shadow-lg);
+    z-index: 300;
+}
+
+.notification-dropdown-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.notification-dropdown-title {
+    font-size: 14px;
     font-weight: 600;
+    color: var(--text-strong);
+}
+
+.mark-read-btn {
+    font-size: 12px;
+    color: var(--accent);
+    background: none;
+    border: none;
+    cursor: pointer;
+}
+
+.notification-list {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.notification-item {
+    display: flex;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    cursor: pointer;
+    transition: background 0.2s ease;
+}
+
+.notification-item:hover {
+    background: var(--surface-hover);
+}
+
+.notification-item.unread {
+    background: var(--accent-soft);
+}
+
+.notification-item-dot {
+    width: 6px;
+    height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    margin-top: 6px;
+    margin-right: 12px;
+    flex-shrink: 0;
+}
+
+.notification-item-body {
+    display: flex;
+    flex-direction: column;
+}
+
+.notification-item-msg {
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+.notification-item-time {
+    font-size: 11px;
+    color: var(--text-muted);
+    margin-top: 4px;
+}
+
+.notification-view-all {
+    width: 100%;
+    padding: 12px;
+    background: transparent;
+    border: none;
+    border-top: 1px solid var(--border);
+    color: var(--accent);
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    text-align: center;
+}
+
+/* ---- Profile Menu ---------------------------------------------------- */
+
+.profile-menu-wrap {
+    position: relative;
+}
+
+.profile-btn {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    color: var(--text-primary);
+    font-size: 11px;
+    font-weight: 600;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+}
+
+.profile-btn:hover {
+    border-color: var(--text-muted);
+}
+
+.profile-menu {
+    position: absolute;
+    top: calc(100% + 8px);
+    right: 0;
+    width: 240px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    box-shadow: var(--shadow-lg);
+    z-index: 300;
+}
+
+.profile-menu-header {
+    padding: 16px;
+    border-bottom: 1px solid var(--border);
+}
+
+.profile-menu-name {
+    display: block;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-strong);
+}
+
+.profile-menu-sub {
+    display: block;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.profile-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 16px;
+    font-size: 14px;
+    color: var(--text-primary);
+    text-decoration: none;
+    transition: background 0.2s ease;
+}
+
+.profile-menu-item:hover {
+    background: var(--surface-hover);
+    color: var(--text-strong);
+}
+
+.profile-menu-divider {
+    height: 1px;
+    background: var(--border);
+    margin: 8px 0;
+}
+
+.profile-menu-logout {
+    color: var(--danger);
+}
+
+.profile-menu-logout:hover {
+    background: var(--danger-soft);
+    color: var(--danger-hover);
+}
+
+@media (max-width: 768px) {
+    .topbar {
+        padding: 0 12px;
+    }
+    .topbar-brand {
+        display: flex;
+    }
+    .search-wrapper {
+        display: none;
+    }
 }

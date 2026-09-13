@@ -1,24 +1,56 @@
-import React from "react";
 import "./Input.css";
 
-const Input = ({ 
-    label, 
-    error, 
-    type = "text", 
-    className = "", 
-    ...props 
+const Input = ({
+    label,
+    hint,
+    error,
+    id,
+    type = "text",
+    className = "",
+    ...props
 }) => {
     const inputClasses = `ui-input ${error ? "input-error" : ""} ${className}`;
-    
+    const describedBy = [
+        id ? `${id}-hint` : "",
+        id ? `${id}-error` : ""
+    ]
+        .filter(Boolean)
+        .join(" ") || undefined;
+
     return (
         <div className="ui-input-wrapper">
-            {label && <label className="ui-input-label">{label}</label>}
-            <input 
-                type={type} 
-                className={inputClasses} 
-                {...props} 
+            {label && (
+                <label
+                    className="ui-input-label"
+                    htmlFor={id || undefined}
+                >
+                    {label}
+                </label>
+            )}
+            {hint && (
+                <span
+                    id={id ? `${id}-hint` : undefined}
+                    className="ui-input-hint"
+                >
+                    {hint}
+                </span>
+            )}
+            <input
+                id={id || undefined}
+                type={type}
+                className={inputClasses}
+                aria-invalid={error ? true : undefined}
+                aria-describedby={describedBy}
+                {...props}
             />
-            {error && <span className="ui-input-error">{error}</span>}
+            {error && (
+                <span
+                    id={id ? `${id}-error` : undefined}
+                    className="ui-input-error"
+                >
+                    {error}
+                </span>
+            )}
         </div>
     );
 };

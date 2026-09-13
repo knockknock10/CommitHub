@@ -54,36 +54,36 @@ const ReleaseList = ({ repository, isOwner }) => {
         description: ""
     });
     const [selectedReleaseId, setSelectedReleaseId] = useState(null);
+    const [loadError, setLoadError] = useState("");
+
+    const loadReleases = async () => {
+        setLoading(true);
+        setLoadError("");
+
+        const params = { limit: PAGE_SIZE, page };
+
+        if (filter !== "all") {
+            params.status = filter;
+        }
+
+        try {
+            const data = await fetchReleases(
+                repository._id,
+                params
+            );
+            setReleases(data.releases || []);
+            setTotalPages(data.pages || 1);
+        } catch (error) {
+            setLoadError(
+                error.response?.data?.message ||
+                "Failed to load versions"
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const loadReleases = async () => {
-            setLoading(true);
-            setMessage("");
-            setMessageType("");
-
-            const params = { limit: PAGE_SIZE, page };
-
-            if (filter !== "all") {
-                params.status = filter;
-            }
-
-            try {
-                const data = await fetchReleases(
-                    repository._id,
-                    params
-                );
-                setReleases(data.releases || []);
-                setTotalPages(data.pages || 1);
-            } catch (error) {
-                setMessageType("error");
-                setMessage(
-                    error.response?.data?.message ||
-                    "Failed to load releases"
-                );
-            } finally {
-                setLoading(false);
-            }
-        };
         loadReleases();
     }, [repository._id, filter, page, reload]);
 
@@ -173,7 +173,7 @@ const ReleaseList = ({ repository, isOwner }) => {
             setMessageType("error");
             setMessage(
                 error.response?.data?.message ||
-                "Failed to create release"
+                "Failed to create version"
             );
         } finally {
             setCreating(false);
@@ -202,20 +202,20 @@ const ReleaseList = ({ repository, isOwner }) => {
     return (
         <div className="releases-view">
             <div className="releases-header">
-                <h3>Releases</h3>
+                <h3>Versions</h3>
                 {isOwner && (
                     <button
                         className="release-new-btn"
                         onClick={() => setShowCreate((prev) => !prev)}
                     >
-                        {showCreate ? "Cancel" : "New release"}
+                        {showCreate ? "Cancel" : "New version"}
                     </button>
                 )}
             </div>
 
             {showCreate && (
                 <div className="release-create">
-                    <h4>Create release</h4>
+                    <h4>Create version</h4>
 
                     <div className="release-tag-choice">
                         <label>
@@ -292,7 +292,7 @@ const ReleaseList = ({ repository, isOwner }) => {
                             <input
                                 className="release-title-input"
                                 type="text"
-                                placeholder="Commit ID (optional, defaults to current branch tip)"
+                                placeholder="Commit ID (optional, defaults to current stream tip)"
                                 value={createForm.newTagCommitId}
                                 onChange={(e) =>
                                     setCreateForm({
@@ -307,7 +307,7 @@ const ReleaseList = ({ repository, isOwner }) => {
                     <input
                         className="release-title-input"
                         type="text"
-                        placeholder="Release title"
+                        placeholder="Version title"
                         value={createForm.title}
                         onChange={(e) =>
                             setCreateForm({
@@ -319,7 +319,7 @@ const ReleaseList = ({ repository, isOwner }) => {
                     />
                     <textarea
                         className="release-notes-input"
-                        placeholder="Release notes"
+                        placeholder="Version notes"
                         value={createForm.description}
                         onChange={(e) =>
                             setCreateForm({
@@ -372,13 +372,34 @@ const ReleaseList = ({ repository, isOwner }) => {
                 ))}
             </div>
 
-            {loading && <p>Loading releases...</p>}
-
-            {!loading && releases.length === 0 && (
-                <p className="commit-empty">No releases found.</p>
+            {loading && (
+                <div className="shared-loading">
+                    <p>Loading versions...</p>
+                </div>
             )}
 
-            {!loading && releases.length > 0 && (
+            {loadError && (
+                <div className="shared-error">
+                    <p>{loadError}</p>
+                    <button
+                        type="button"
+                        className="state-btn"
+                        onClick={loadReleases}
+                    >
+                        Retry
+                    </button>
+                </div>
+            )}
+
+            {!loading && !loadError && releases.length === 0 && (
+                <div className="shared-empty-state">
+                    <p>
+                        No {filter === "all" ? "" : filter} versions found.
+                    </p>
+                </div>
+            )}
+
+            {!loading && !loadError && releases.length > 0 && (
                 <div className="release-list">
                     {releases.map((release) => (
                         <button
@@ -416,7 +437,7 @@ const ReleaseList = ({ repository, isOwner }) => {
                 </div>
             )}
 
-            {!loading && totalPages > 1 && (
+            {!loading && !loadError && totalPages > 1 && (
                 <div className="release-pagination">
                     <button
                         className="release-filter"

@@ -23,9 +23,14 @@ export const SocketProvider = ({ children }) => {
 
         const onConnect = () => setConnected(true);
         const onDisconnect = () => setConnected(false);
+        const onConnectError = () => {
+            console.warn("[Socket] Connection failed — server may be unreachable");
+            setConnected(false);
+        };
 
         socket.on("connect", onConnect);
         socket.on("disconnect", onDisconnect);
+        socket.on("connect_error", onConnectError);
 
         if (socket.connected) {
             setConnected(true);
@@ -34,6 +39,7 @@ export const SocketProvider = ({ children }) => {
         return () => {
             socket.off("connect", onConnect);
             socket.off("disconnect", onDisconnect);
+            socket.off("connect_error", onConnectError);
             disconnectSocket();
             setConnected(false);
         };

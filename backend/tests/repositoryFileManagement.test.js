@@ -209,6 +209,7 @@ after(async () => {
 
     server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
+    await mongoose.connection.db.dropDatabase();
     await mongoose.disconnect();
 });
 

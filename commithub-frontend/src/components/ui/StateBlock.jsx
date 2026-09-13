@@ -1,13 +1,10 @@
-const StateBlock = ({
-    variant,
-    message,
-    retry = null,
-    action = null
-}) => {
+import { RefreshIcon, InfoIcon, AlertIcon } from "./icons";
+
+const StateBlock = ({ variant, message, retry = null, action = null }) => {
     if (variant === "loading") {
         return (
             <div className="shared-loading">
-                <p>{message}</p>
+                <p>{message || "Loading..."}</p>
             </div>
         );
     }
@@ -15,6 +12,7 @@ const StateBlock = ({
     if (variant === "error") {
         return (
             <div className="shared-error">
+                <AlertIcon size={20} />
                 <p>{message}</p>
                 {retry && (
                     <button
@@ -22,6 +20,7 @@ const StateBlock = ({
                         className="state-btn"
                         onClick={retry}
                     >
+                        <RefreshIcon size={14} />
                         Retry
                     </button>
                 )}
@@ -31,6 +30,7 @@ const StateBlock = ({
 
     return (
         <div className="shared-empty-state">
+            <InfoIcon size={20} />
             {message && <p>{message}</p>}
             {action && (
                 <button

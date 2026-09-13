@@ -49,26 +49,27 @@ const ReleaseDetails = ({ repository, isOwner, releaseId, onBack }) => {
     const [message, setMessage] = useState("");
     const [messageType, setMessageType] = useState("");
 
-    useEffect(() => {
-        const loadRelease = async () => {
-            setLoading(true);
-            setError("");
+    const loadRelease = async () => {
+        setLoading(true);
+        setError("");
 
-            try {
-                const data = await fetchRelease(
-                    repository._id,
-                    releaseId
-                );
-                setRelease(data);
-            } catch (loadError) {
-                setError(
-                    loadError.response?.data?.message ||
-                    "Failed to load release"
-                );
-            } finally {
-                setLoading(false);
-            }
-        };
+        try {
+            const data = await fetchRelease(
+                repository._id,
+                releaseId
+            );
+            setRelease(data);
+        } catch (loadError) {
+            setError(
+                loadError.response?.data?.message ||
+                "Failed to load version"
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
         loadRelease();
     }, [repository._id, releaseId]);
 
@@ -131,12 +132,12 @@ const ReleaseDetails = ({ repository, isOwner, releaseId, onBack }) => {
             setRelease(updated);
             setEditing(false);
             setMessageType("success");
-            setMessage("Release updated");
+            setMessage("Version updated");
         } catch (saveError) {
             setMessageType("error");
             setMessage(
                 saveError.response?.data?.message ||
-                "Failed to update release"
+                "Failed to update version"
             );
         } finally {
             setSaving(false);
@@ -157,12 +158,12 @@ const ReleaseDetails = ({ repository, isOwner, releaseId, onBack }) => {
             setRelease(updated);
             setEditing(false);
             setMessageType("success");
-            setMessage("Release published");
+            setMessage("Version published");
         } catch (publishError) {
             setMessageType("error");
             setMessage(
                 publishError.response?.data?.message ||
-                "Failed to publish release"
+                "Failed to publish version"
             );
         } finally {
             setPublishing(false);
@@ -170,15 +171,34 @@ const ReleaseDetails = ({ repository, isOwner, releaseId, onBack }) => {
     };
 
     if (loading) {
-        return <p>Loading release...</p>;
+        return (
+            <div className="shared-loading">
+                <p>Loading version...</p>
+            </div>
+        );
     }
 
     if (error) {
-        return <p className="commit-error">{error}</p>;
+        return (
+            <div className="shared-error">
+                <p>{error}</p>
+                <button
+                    type="button"
+                    className="state-btn"
+                    onClick={loadRelease}
+                >
+                    Retry
+                </button>
+            </div>
+        );
     }
 
     if (!release) {
-        return <p className="commit-empty">Release not found.</p>;
+        return (
+            <div className="shared-empty-state">
+                <p>Version not found.</p>
+            </div>
+        );
     }
 
     const isDraft = release.status === "draft";
@@ -189,7 +209,7 @@ const ReleaseDetails = ({ repository, isOwner, releaseId, onBack }) => {
                 className="file-viewer-back"
                 onClick={onBack}
             >
-                Back to releases
+                Back to versions
             </button>
 
             <div className="release-detail-header">
@@ -250,7 +270,7 @@ const ReleaseDetails = ({ repository, isOwner, releaseId, onBack }) => {
                                 className="commit-submit-btn"
                                 onClick={startEditing}
                             >
-                                Edit release
+                                Edit version
                             </button>
                             <button
                                 className="release-publish-btn"
@@ -259,7 +279,7 @@ const ReleaseDetails = ({ repository, isOwner, releaseId, onBack }) => {
                             >
                                 {publishing
                                     ? "Publishing..."
-                                    : "Publish release"}
+                                    : "Publish version"}
                             </button>
                         </>
                     ) : (
@@ -267,7 +287,7 @@ const ReleaseDetails = ({ repository, isOwner, releaseId, onBack }) => {
                             className="commit-submit-btn"
                             onClick={startEditing}
                         >
-                            Edit release
+                            Edit version
                         </button>
                     )}
                 </div>
@@ -275,7 +295,7 @@ const ReleaseDetails = ({ repository, isOwner, releaseId, onBack }) => {
 
             {editing && (
                 <div className="release-edit-form">
-                    <h4>Edit release</h4>
+                    <h4>Edit version</h4>
                     <input
                         className="release-title-input"
                         type="text"
@@ -291,7 +311,7 @@ const ReleaseDetails = ({ repository, isOwner, releaseId, onBack }) => {
                     />
                     <textarea
                         className="release-notes-input"
-                        placeholder="Release notes"
+                        placeholder="Version notes"
                         value={editForm.description}
                         onChange={(e) =>
                             setEditForm({
@@ -340,13 +360,13 @@ const ReleaseDetails = ({ repository, isOwner, releaseId, onBack }) => {
             )}
 
             <div className="release-notes">
-                <h4>Release notes</h4>
+                <h4>Version notes</h4>
                 {release.description ? (
                     <pre className="release-notes-text">
                         {release.description}
                     </pre>
                 ) : (
-                    <p className="commit-empty">No release notes.</p>
+                    <p className="commit-empty">No version notes.</p>
                 )}
             </div>
 

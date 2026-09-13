@@ -2,9 +2,12 @@ import { useState, useEffect } from "react";
 import { getCollaborators, addCollaborator, updateCollaborator, removeCollaborator } from "../../api/collaboratorApi";
 import { globalSearch } from "../../api/searchApi";
 import { useRealtimeEvent } from "../../hooks/useRealtimeEvent";
+import Button from "../ui/Button";
+import Input from "../ui/Input";
+import Select from "../ui/Select";
 
 const ROLE_OPTIONS = [
-    { value: "maintainer", label: "Maintainer", description: "Can manage collaborators, branch protection, and merge PRs" },
+    { value: "maintainer", label: "Maintainer", description: "Can manage members, stream protection, and merge PRs" },
     { value: "developer", label: "Developer", description: "Can create PRs, review, comment, and push" },
     { value: "reporter", label: "Reporter", description: "Can view, comment, and review" },
     { value: "read_only", label: "Read Only", description: "Can view the repository" }
@@ -21,15 +24,18 @@ const Collaborators = ({ repository, userRole }) => {
     const [adding, setAdding] = useState(false);
     const [editingId, setEditingId] = useState(null);
     const [editingRole, setEditingRole] = useState("");
+    const [busyId, setBusyId] = useState(null);
 
     const canManage = userRole === "owner" || userRole === "maintainer";
 
     const loadCollaborators = async () => {
+        setLoading(true);
+        setError("");
         try {
             const data = await getCollaborators(repository._id);
             setCollaborators(data);
-        } catch (err) {
-            setError("Failed to load collaborators");
+        } catch {
+            setError("Failed to load members");
         } finally {
             setLoading(false);
         }
@@ -85,13 +91,15 @@ const Collaborators = ({ repository, userRole }) => {
             setSearchResults([]);
             await loadCollaborators();
         } catch (err) {
-            setError(err.response?.data?.message || "Failed to add collaborator");
+            setError(err.response?.data?.message || "Failed to add member");
         } finally {
             setAdding(false);
         }
     };
 
     const handleRoleChange = async (userId, newRole) => {
+        setBusyId(userId);
+        setError("");
         try {
             await updateCollaborator(repository._id, userId, { role: newRole });
             setEditingId(null);
@@ -99,77 +107,97 @@ const Collaborators = ({ repository, userRole }) => {
             await loadCollaborators();
         } catch (err) {
             setError(err.response?.data?.message || "Failed to update role");
+        } finally {
+            setBusyId(null);
         }
     };
 
     const handleRemove = async (userId) => {
+        setBusyId(userId);
+        setError("");
         try {
             await removeCollaborator(repository._id, userId);
             await loadCollaborators();
         } catch (err) {
-            setError(err.response?.data?.message || "Failed to remove collaborator");
+            setError(err.response?.data?.message || "Failed to remove member");
+        } finally {
+            setBusyId(null);
         }
     };
 
     if (loading) {
-        return <div className="repo-collaborators-loading">Loading collaborators...</div>;
+        return (
+            <div className="shared-loading">
+                <p>Loading members...</p>
+            </div>
+        );
     }
 
     return (
         <div className="repo-collaborators">
             {error && (
-                <div className="repo-settings-message error">{error}</div>
+                <div className="shared-error">
+                    <p>{error}</p>
+                    <button
+                        type="button"
+                        className="state-btn"
+                        onClick={loadCollaborators}
+                    >
+                        Retry
+                    </button>
+                </div>
             )}
 
             {canManage && (
                 <div className="repo-collaborators-section">
-                    <h3>Add Collaborator</h3>
+                    <h3>Add Member</h3>
                     <div className="repo-collaborators-add">
                         <div className="repo-collaborators-search">
-                            <input
-                                type="text"
-                                placeholder="Search by username..."
-                                value={searchQuery}
-                                onChange={(e) => handleSearch(e.target.value)}
-                                className="repo-settings-field-input"
-                            />
+                                <Input
+                                    type="text"
+                                    placeholder="Search by username..."
+                                    value={searchQuery}
+                                    onChange={(e) => handleSearch(e.target.value)}
+                                    className="repo-settings-field-input"
+                                />
                             {searching && <span className="repo-collaborators-searching">Searching...</span>}
                             {searchResults.length > 0 && (
                                 <div className="repo-collaborators-search-results">
                                     {searchResults.map(user => (
                                         <div key={user._id} className="repo-collaborators-search-result">
                                             <span>{user.userName}</span>
-                                            <button
+                                            <Button
                                                 onClick={() => handleAdd(user._id)}
                                                 disabled={adding}
-                                                className="repo-collaborators-add-btn"
+                                                loading={adding}
+                                                variant="secondary"
+                                                size="small"
                                             >
                                                 Add
-                                            </button>
+                                            </Button>
                                         </div>
                                     ))}
                                 </div>
                             )}
                         </div>
                         <div className="repo-collaborators-role-select">
-                            <label>Role:</label>
-                            <select
+                            <Select
+                                label="Role"
                                 value={selectedRole}
                                 onChange={(e) => setSelectedRole(e.target.value)}
-                            >
-                                {ROLE_OPTIONS.map(opt => (
-                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                ))}
-                            </select>
+                                options={ROLE_OPTIONS.map(opt => ({ label: opt.label, value: opt.value }))}
+                            />
                         </div>
                     </div>
                 </div>
             )}
 
             <div className="repo-collaborators-section">
-                <h3>Collaborators ({collaborators.length})</h3>
-                {collaborators.length === 0 ? (
-                    <p className="repo-collaborators-empty">No collaborators yet. Add one above.</p>
+                <h3>Members ({collaborators.length})</h3>
+                {!error && collaborators.length === 0 ? (
+                    <div className="shared-empty-state">
+                        <p>No members yet. Add one above.</p>
+                    </div>
                 ) : (
                     <div className="repo-collaborators-list">
                         {collaborators.map(collab => (
@@ -181,44 +209,54 @@ const Collaborators = ({ repository, userRole }) => {
                                 <div className="repo-collaborators-actions">
                                     {editingId === collab._id ? (
                                         <div className="repo-collaborators-edit">
-                                            <select
+                                            <Select
                                                 value={editingRole}
                                                 onChange={(e) => setEditingRole(e.target.value)}
-                                            >
-                                                {ROLE_OPTIONS.map(opt => (
-                                                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                                                ))}
-                                            </select>
-                                            <button
+                                                options={ROLE_OPTIONS.map(opt => ({ label: opt.label, value: opt.value }))}
+                                            />
+                                            <Button
                                                 onClick={() => handleRoleChange(collab.user?._id || collab.user, editingRole)}
                                                 className="repo-collaborators-save-btn"
+                                                variant="primary"
+                                                size="small"
+                                                loading={busyId === (collab.user?._id || collab.user)}
+                                                disabled={busyId === (collab.user?._id || collab.user)}
                                             >
                                                 Save
-                                            </button>
-                                            <button
+                                            </Button>
+                                            <Button
                                                 onClick={() => { setEditingId(null); setEditingRole(""); }}
                                                 className="repo-collaborators-cancel-btn"
+                                                variant="secondary"
+                                                size="small"
+                                                disabled={busyId === (collab.user?._id || collab.user)}
                                             >
                                                 Cancel
-                                            </button>
+                                            </Button>
                                         </div>
                                     ) : (
                                         <>
                                             <span className="repo-collaborators-role">{collab.role}</span>
                                             {canManage && (
                                                 <>
-                                                    <button
+                                                    <Button
                                                         onClick={() => { setEditingId(collab._id); setEditingRole(collab.role); }}
                                                         className="repo-collaborators-edit-btn"
+                                                        variant="secondary"
+                                                        size="small"
                                                     >
                                                         Edit
-                                                    </button>
-                                                    <button
+                                                    </Button>
+                                                    <Button
                                                         onClick={() => handleRemove(collab.user?._id || collab.user)}
                                                         className="repo-collaborators-remove-btn"
+                                                        variant="danger"
+                                                        size="small"
+                                                        loading={busyId === (collab.user?._id || collab.user)}
+                                                        disabled={busyId === (collab.user?._id || collab.user)}
                                                     >
                                                         Remove
-                                                    </button>
+                                                    </Button>
                                                 </>
                                             )}
                                         </>

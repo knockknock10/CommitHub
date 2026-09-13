@@ -1,3 +1,4 @@
+import Repository from "../models/repoModel.js";
 import Collaborator, { COLLABORATOR_ROLES } from "../models/collaboratorModel.js";
 import OrganizationMembership from "../models/organizationMembershipModel.js";
 import TeamMembership from "../models/teamMembershipModel.js";
@@ -50,11 +51,32 @@ export const roleHasPermission = (role, permission) => {
 };
 
 export const getUserRepositoryRole = async (userId, repositoryId) => {
-    // 1. Direct Collaborator Role
+    const repository = await Repository.findById(repositoryId).lean();
+
+    if (!repository) {
+        return null;
+    }
+
+    // 1. Direct Repository Owner
+    if (repository.owner && repository.owner.toString() === userId.toString()) {
+        return "owner";
+    }
+
+    // 2. Organization-level Role
+    if (repository.organization) {
+        const orgMembership = await OrganizationMembership.findOne({
+            organization: repository.organization,
+            user: userId,
+            role: { $in: ["OWNER", "ADMIN"] }
+        }).lean();
+        if (orgMembership) return "owner";
+    }
+
+    // 3. Direct Collaborator Role
     const collaborator = await Collaborator.findOne({ repository: repositoryId, user: userId }).lean();
     if (collaborator) return collaborator.role;
 
-    // 2. Team-based Role
+    // 4. Team-based Role
     const teamMemberships = await TeamMembership.find({ user: userId }).lean();
     const teamRoles = await TeamRepoPermission.find({
         repository: repositoryId,

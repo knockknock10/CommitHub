@@ -213,8 +213,8 @@ const prMergeRequest = (repository, number, token) =>
         token
     );
 
-const setupFastForwardRepo = async () => {
-    const repo = await createRepo("prrepo");
+const setupFastForwardRepo = async (name = "prrepo") => {
+    const repo = await createRepo(name);
     await writeRepoFile(repo, "base.txt", "base");
     await commitHeadCommit(repo, "base");
     await createBranchRequest(repo, { name: "dev" }, ownerToken);
@@ -295,6 +295,7 @@ after(async () => {
 
     server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
+    await mongoose.connection.db.dropDatabase();
     await mongoose.disconnect();
 });
 
@@ -451,8 +452,8 @@ describe("pull request creation", () => {
     });
 
     it("numbers pull requests per repository", async () => {
-        const repoA = await setupFastForwardRepo();
-        const repoB = await setupFastForwardRepo();
+        const repoA = await setupFastForwardRepo("prrepo-a");
+        const repoB = await setupFastForwardRepo("prrepo-b");
 
         await openPullRequest(repoA, { title: "a" });
         const response = await openPullRequest(repoB, { title: "b" });

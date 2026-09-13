@@ -1,32 +1,96 @@
 import Comment from "../models/commentModel.js";
-import Issue from "../models/issueMode.js";
+import Issue from "../models/issueModel.js";
+import Repository from "../models/repoModel.js";
+import { authorizeRepository } from "../utils/repoAccess.js";
 import {
     createNotification,
     createMentionNotifications,
     buildNotificationMessage
-} from "../utils/notificationService.js";
-import { createActivity } from "../utils/activityService.js";
+} from "../services/notificationService.js";
+import { createActivity } from "../services/activityService.js";
 
-export const createComment = async (req,res) => {
+/* Load an issue by ID and authorize the acting user against the issue's
+   own repository. Writes the 403/404 response itself, returns null when
+   denied. */
+const authorizeIssueRepository = async (req, res, issueId, writeOperation) => {
+    const issue = await Issue.findById(issueId);
+
+    if (!issue || !issue.repository) {
+        res.status(404).json({
+            message: "Issue not found"
+        });
+        return null;
+    }
+
+    const repository = await Repository.findById(
+        issue.repository
+    );
+
+    if (!repository) {
+        res.status(404).json({
+            message: "Issue not found"
+        });
+        return null;
+    }
+
+    const original = req.params;
+    req.params = { id: repository._id.toString() };
 
     try {
-
-        const issue = await Issue.findById(
-            req.params.issueId
+        const result = await authorizeRepository(
+            req,
+            res,
+            writeOperation
         );
 
-        if(!issue){
-            return res.status(404).json({
-                message:"Issue not found"
+        if (!result) {
+            return null;
+        }
+
+        return {
+            issue,
+            repository,
+            auth: result
+        };
+    } finally {
+        req.params = original;
+    }
+};
+
+export const createComment = async (req, res) => {
+    try {
+        /* Comments are a read-level collaborative artifact (like issues):
+           any user who can read the issue's repository may comment. The
+           read gate protects private issue threads from unauthored access.
+           Previously this endpoint had NO repository authorization at all. */
+        const result = await authorizeIssueRepository(
+            req,
+            res,
+            req.params.issueId,
+            false
+        );
+
+        if (!result) {
+            return;
+        }
+
+        const { issue } = result;
+
+        const content =
+            typeof req.body?.content === "string"
+                ? req.body.content.trim()
+                : "";
+
+        if (content === "") {
+            return res.status(400).json({
+                message: "Comment content is required"
             });
         }
 
-        const { content } = req.body;
-
         const comment = await Comment.create({
             content,
-            author:req.user._id,
-            issue:issue._id
+            author: req.user._id,
+            issue: issue._id
         });
 
         await createNotification({
@@ -58,88 +122,96 @@ export const createComment = async (req,res) => {
             metadata: { issueTitle: issue.title }
         });
 
-        const populatedComment =
-            await Comment.findById(comment._id)
-            .populate(
-                "author",
-                "userName email"
-            );
+        const populatedComment = await Comment.findById(
+            comment._id
+        )
+            .populate("author", "userName email");
 
-        res.status(201).json(
-            populatedComment
-        );
-
-    } catch(err){
-
+        res.status(201).json(populatedComment);
+    } catch (err) {
         res.status(500).json({
-            message:err.message
+            message: "Server error"
         });
     }
 };
 
-export const getIssueComments = async (req,res) => {
-
+export const getIssueComments = async (req, res) => {
     try {
-
-        const comments =
-            await Comment.find({
-                issue:req.params.issueId
-            })
-            .populate(
-                "author",
-                "userName email"
-            )
-            .sort({
-                createdAt:1
-            });
-
-        res.status(200).json(
-            comments
+        const result = await authorizeIssueRepository(
+            req,
+            res,
+            req.params.issueId,
+            false
         );
 
-    } catch(err){
+        if (!result) {
+            return;
+        }
 
+        const comments = await Comment.find({
+            issue: result.issue._id
+        })
+            .populate("author", "userName email")
+            .sort({ createdAt: 1 });
+
+        res.status(200).json(comments);
+    } catch (err) {
         res.status(500).json({
-            message:err.message
+            message: "Server error"
         });
     }
 };
 
-export const deleteComment = async (req,res) => {
-
+export const deleteComment = async (req, res) => {
     try {
+        const comment = await Comment.findById(
+            req.params.commentId
+        );
 
-        const comment =
-            await Comment.findById(
-                req.params.commentId
-            );
-
-        if(!comment){
+        if (!comment) {
             return res.status(404).json({
-                message:"Comment not found"
+                message: "Comment not found"
             });
         }
 
-        if(
-            comment.author.toString()
-            !==
-            req.user._id.toString()
-        ){
+        const result = await authorizeIssueRepository(
+            req,
+            res,
+            comment.issue,
+            false
+        );
+
+        if (!result) {
+            return;
+        }
+
+        /* repository author or comment author may delete the comment.
+           The acting user must already hold read access to the
+           comment's repository (checked above), so private issue
+           threads are protected from non-members. */
+        const isAuthor =
+            comment.author.toString() ===
+            req.user._id.toString();
+
+        const isRepoOwner =
+            result.repository.owner &&
+            result.repository.owner.toString() ===
+            req.user._id.toString();
+
+        if (!isAuthor && !isRepoOwner) {
             return res.status(403).json({
-                message:"Not authorized"
+                message: "Not authorized"
             });
         }
 
         await comment.deleteOne();
 
         res.status(200).json({
-            message:"Comment deleted"
+            message: "Comment deleted"
         });
-
-    } catch(err){
-
+    } catch (err) {
         res.status(500).json({
-            message:err.message
+            message: "Server error"
         });
     }
 };

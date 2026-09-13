@@ -1,7 +1,7 @@
 import Tag from "../models/tagModel.js";
 import Release from "../models/releaseModel.js";
 import { authorizeRepository } from "../utils/repoAccess.js";
-import { createActivity } from "../utils/activityService.js";
+import { createActivity } from "../services/activityService.js";
 import { getRepoRoot } from "../utils/repoStorage.js";
 import {
     ensureVersionControl,

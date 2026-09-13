@@ -1,34 +1,323 @@
-.profile-page{
-    max-width:1000px;
-    margin:auto;
-    padding:24px;
+/* ============================================================================
+   Profile — GitHub Professional Dark
+   ========================================================================== */
+
+.profile-page {
+    max-width: 1280px;
+    margin: 0 auto;
+    padding: 0 24px;
 }
 
-.profile-header{
-    margin-bottom:30px;
+/* ---- Header ----------------------------------------------------------- */
+
+.profile-header {
+    display: flex;
+    gap: 32px;
+    padding: 48px 0;
+    align-items: flex-start;
 }
 
-.profile-header h1{
-    color:white;
-    margin-bottom:5px;
+.profile-avatar {
+    width: 120px;
+    height: 120px;
+    border-radius: 50%;
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    color: var(--text-strong);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 32px;
+    font-weight: 700;
+    flex-shrink: 0;
 }
 
-.profile-header p{
-    color:#8b949e;
+.profile-info {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
 }
 
-.profile-stats{
-    display:grid;
-    grid-template-columns:repeat(3,1fr);
-    gap:20px;
-    margin-bottom:30px;
+.profile-name {
+    font-size: 32px;
+    font-weight: 600;
+    color: var(--text-strong);
+    margin: 0;
+    letter-spacing: -0.03em;
 }
 
-.profile-stats div{
-    background:#161b22;
-    border:1px solid #30363d;
-    padding:20px;
-    border-radius:10px;
-    text-align:center;
-    color:white;
+.profile-username {
+    font-size: 16px;
+    color: var(--text-muted);
+    font-family: var(--font-mono);
+}
+
+.profile-bio {
+    font-size: 15px;
+    color: var(--text-primary);
+    line-height: 1.5;
+    max-width: 600px;
+    margin: 8px 0;
+}
+
+.profile-stats {
+    display: flex;
+    gap: 24px;
+    margin-top: 16px;
+}
+
+.profile-stat {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 14px;
+}
+
+.profile-stat-value {
+    font-weight: 600;
+    color: var(--text-strong);
+}
+
+.profile-stat-label {
+    color: var(--text-muted);
+}
+
+/* ---- Tabs ------------------------------------------------------------- */
+
+.profile-tabs {
+    display: flex;
+    gap: 2px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 32px;
+}
+
+.profile-tab {
+    padding: 8px 16px;
+    background: transparent;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-muted);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.profile-tab:hover {
+    color: var(--text-strong);
+    background: var(--surface-hover);
+}
+
+.profile-tab.active {
+    color: var(--text-strong);
+    border-bottom-color: var(--accent);
+    background: var(--surface-hover);
+}
+
+/* ---- Main Layout ------------------------------------------------------ */
+
+.profile-content {
+    display: grid;
+    grid-template-columns: 1fr 300px;
+    gap: 32px;
+    align-items: start;
+    padding-bottom: 80px;
+}
+
+.profile-main {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+}
+
+.profile-main-sections {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+}
+
+/* ---- Repository Sections ------------------------------------------------ */
+
+.profile-section {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.profile-section-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.profile-section-header h2 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-strong);
+    margin: 0;
+}
+
+.profile-section-count {
+    font-size: 12px;
+    color: var(--text-muted);
+    background: var(--surface-elevated);
+    padding: 2px 8px;
+    border-radius: 10px;
+    border: 1px solid var(--border);
+}
+
+.profile-repo-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.profile-repo-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 16px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    text-decoration: none;
+    transition: border-color 0.2s ease;
+}
+
+.profile-repo-item:hover {
+    border-color: var(--text-muted);
+}
+
+.profile-repo-icon {
+    color: var(--accent);
+    display: flex;
+    align-items: center;
+}
+
+.profile-repo-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    flex: 1;
+}
+
+.profile-repo-name {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--accent);
+}
+
+.profile-repo-meta {
+    display: flex;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.profile-repo-visibility {
+    font-weight: 500;
+}
+
+.profile-repo-stat {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.profile-view-all {
+    background: none;
+    border: none;
+    color: var(--accent);
+    font-size: 14px;
+    cursor: pointer;
+    text-align: left;
+    padding: 0;
+}
+
+.profile-view-all:hover {
+    text-decoration: underline;
+}
+
+/* ---- Activity Timeline ------------------------------------------------- */
+
+.profile-activity-list {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.profile-activity-item {
+    display: flex;
+    gap: 12px;
+    padding: 8px 0;
+    font-size: 13px;
+    color: var(--text-primary);
+}
+
+.profile-activity-dot {
+    width: 6px;
+    height: 6px;
+    background: var(--accent);
+    border-radius: 50%;
+    margin-top: 6px;
+    flex-shrink: 0;
+}
+
+.profile-activity-text {
+    line-height: 1.5;
+}
+
+.profile-activity-time {
+    font-size: 12px;
+    color: var(--text-muted);
+    margin-left: 8px;
+}
+
+/* ---- Sidebar Panels ---------------------------------------------------- */
+
+.profile-sidebar {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.profile-sidebar-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+}
+
+.profile-sidebar-panel-header {
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-strong);
+}
+
+.profile-sidebar-panel-body {
+    padding: 16px;
+    font-size: 14px;
+    color: var(--text-primary);
+    line-height: 1.5;
+}
+
+@media (max-width: 1024px) {
+    .profile-content {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 768px) {
+    .profile-header {
+        flex-direction: column;
+        align-items: center;
+        text-align: center;
+    }
+    .profile-info {
+        align-items: center;
+    }
+    .profile-stats {
+        justify-content: center;
+    }
 }

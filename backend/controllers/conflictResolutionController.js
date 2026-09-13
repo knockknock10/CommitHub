@@ -22,7 +22,7 @@ import {
     computeConflictRegions,
     readFileFromSnapshot
 } from "../utils/diffMerge.js";
-import { createActivity } from "../utils/activityService.js";
+import { createActivity } from "../services/activityService.js";
 
 const RESOLUTION_STRATEGIES = ["keep_source", "keep_target", "custom"];
 const RESOLVABLE_REASONS = ["both_added", "both_modified"];

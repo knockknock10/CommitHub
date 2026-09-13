@@ -1,240 +1,627 @@
-.create-repo-page{
-    min-height:100vh;
-    background:#0d1117;
-    padding:35px 18px;
+/* ============================================================================
+   CreateRepoModal — razor density, deep black + electric cyan
+   ========================================================================== */
+
+/* ---- Page wrapper ------------------------------------------------------ */
+
+.create-repo-page {
+    min-height: calc(100vh - 60px);
+    display: flex;
+    justify-content: center;
+    padding: var(--space-2xl) var(--space-lg);
 }
 
-.create-repo-container{
-    max-width:820px;
-    margin:0 auto;
+/* ---- Card container ---------------------------------------------------- */
+
+.create-repo-container {
+    width: 100%;
+    max-width: 640px;
 }
 
-.create-repo-top{
-    margin-bottom:32px;
+/* ---- Header ------------------------------------------------------------ */
+
+.create-repo-top {
+    margin-bottom: var(--space-2xl);
 }
 
-.create-repo-top h1{
-    color:white;
-    font-size:2rem;
-    margin-bottom:8px;
-    font-weight:600;
+.create-repo-top h1 {
+    margin: 0 0 var(--space-xs);
+    font-size: var(--fs-2xl);
+    font-weight: 700;
+    color: var(--text-strong);
+    letter-spacing: -0.03em;
+    line-height: 1.2;
 }
 
-.create-repo-top p{
-    color:#8b949e;
-    font-size:0.92rem;
+.create-repo-top p {
+    margin: 0;
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+    line-height: 1.4;
 }
 
-.create-repo-form{
-    display:flex;
-    flex-direction:column;
-    gap:32px;
+/* ---- Form -------------------------------------------------------------- */
+
+.create-repo-form {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-2xl);
 }
 
-.create-repo-section{
-    display:flex;
-    gap:20px;
+/* ---- Step section ------------------------------------------------------ */
+
+.create-repo-section {
+    display: flex;
+    gap: var(--space-lg);
+    align-items: flex-start;
 }
 
-.create-step-circle{
-    width:30px;
-    height:30px;
-    border-radius:50%;
-    background:#21262d;
-    color:white;
-    display:flex;
-    align-items:center;
-    justify-content:center;
-    font-weight:600;
-    font-size:0.9rem;
-    flex-shrink:0;
-    margin-top:4px;
+.create-step-circle {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    border-radius: 50%;
+    border: 1.5px solid var(--accent-border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: var(--font-mono);
+    font-size: var(--fs-sm);
+    font-weight: 700;
+    color: var(--accent);
+    background: var(--accent-soft);
+    margin-top: 1px;
 }
 
-.create-repo-section-content{
-    flex:1;
-    border-left:1px solid #30363d;
-    padding-left:24px;
+.create-repo-section-content {
+    flex: 1;
+    min-width: 0;
+    background: var(--surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-xl);
+    padding: var(--space-xl);
 }
 
-.create-repo-section-content h2{
-    color:white;
-    margin-bottom:20px;
-    font-size:1.3rem;
+.create-repo-section-content h2 {
+    margin: 0 0 var(--space-lg);
+    font-size: var(--fs-lg);
+    font-weight: 600;
+    color: var(--text-strong);
+    letter-spacing: -0.01em;
 }
 
-.create-repo-name-wrapper{
-    display:flex;
-    align-items:flex-end;
-    gap:10px;
-    margin-bottom:14px;
+/* ---- Name row (owner / slash / name) ----------------------------------- */
+
+.create-repo-name-wrapper {
+    display: flex;
+    align-items: flex-end;
+    gap: var(--space-sm);
 }
 
-.create-slash{
-    color:#8b949e;
-    font-size:1.7rem;
-    margin-bottom:6px;
+.create-repo-input-box {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
 }
 
-.create-repo-input-box{
-    display:flex;
-    flex-direction:column;
-    gap:8px;
+.create-repo-input-box > label,
+.create-repo-input-box > .ui-input-wrapper > .ui-input-label {
+    font-size: var(--fs-xs);
+    font-weight: 600;
+    color: var(--text-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
 }
 
-.create-repo-flex{
-    flex:1;
+.owner-display {
+    display: flex;
+    align-items: center;
+    height: 32px;
+    padding: 0 var(--space-md);
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--text-strong);
+    white-space: nowrap;
+    user-select: none;
 }
 
-.create-repo-input-box label{
-    color:#c9d1d9;
-    font-size:0.88rem;
-    font-weight:600;
+.create-slash {
+    font-family: var(--font-mono);
+    font-size: var(--fs-lg);
+    font-weight: 300;
+    color: var(--text-faint);
+    line-height: 32px;
+    flex-shrink: 0;
+    padding: 0 var(--space-xs);
 }
 
-.create-repo-input-box input,
-.create-repo-input-box textarea,
-.create-repo-input-box select{
-    background:#0d1117;
-    border:1px solid #30363d;
-    color:white;
-    border-radius:7px;
-    padding:10px 12px;
-    outline:none;
-    font-size:0.88rem;
+.create-repo-flex {
+    flex: 1;
 }
 
-.create-repo-input-box input:focus,
-.create-repo-input-box textarea:focus,
-.create-repo-input-box select:focus{
-    border-color:#2f81f7;
-    box-shadow:0 0 0 3px rgba(47,129,247,0.12);
+/* ---- Hint text --------------------------------------------------------- */
+
+.create-repo-hint {
+    margin: var(--space-sm) 0 0;
+    font-size: var(--fs-xs);
+    color: var(--text-faint);
+    line-height: 1.4;
 }
 
-.create-repo-input-box textarea{
-    resize:none;
+/* ---- Config cards ------------------------------------------------------ */
+
+.create-config-card {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-lg);
+    padding: var(--space-md) var(--space-lg);
+    background: var(--bg);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    transition: border-color var(--duration-fast) var(--ease);
 }
 
-.create-repo-hint{
-    color:#8b949e;
-    margin-bottom:20px;
-    font-size:0.85rem;
+.create-config-card + .create-config-card {
+    margin-top: var(--space-sm);
 }
 
-.create-config-card{
-    border:1px solid #30363d;
-    border-radius:8px;
-    padding:16px 18px;
-    display:flex;
-    justify-content:space-between;
-    align-items:center;
-    background:#0d1117;
-    margin-bottom:14px;
+.create-config-card:hover {
+    border-color: var(--border);
 }
 
-.create-config-left h3{
-    color:white;
-    margin-bottom:6px;
-    font-size:0.95rem;
+.create-config-left {
+    flex: 1;
+    min-width: 0;
 }
 
-.create-config-left p{
-    color:#8b949e;
-    font-size:0.84rem;
+.create-config-left h3 {
+    margin: 0 0 2px;
+    font-size: var(--fs-base);
+    font-weight: 600;
+    color: var(--text-primary);
+    line-height: 1.3;
 }
 
-.create-config-card select{
-    background:#21262d;
-    border:1px solid #30363d;
-    color:white;
-    border-radius:7px;
-    padding:8px 12px;
-    outline:none;
-    font-size:0.85rem;
+.create-config-left p {
+    margin: 0;
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+    line-height: 1.4;
 }
 
-.create-repo-actions{
-    display:flex;
-    justify-content:flex-end;
-    gap:12px;
-    margin-top:4px;
+.create-config-right {
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
 }
 
-.create-cancel-btn{
-    background:transparent;
-    border:1px solid #30363d;
-    color:#c9d1d9;
-    padding:10px 18px;
-    border-radius:7px;
-    cursor:pointer;
-    font-size:0.88rem;
+/* ---- Toggle switch ----------------------------------------------------- */
+
+.create-switch {
+    position: relative;
+    display: inline-block;
+    width: 36px;
+    height: 20px;
+    cursor: pointer;
 }
 
-.create-cancel-btn:hover{
-    background:#21262d;
+.create-switch input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+    position: absolute;
 }
 
-.create-btn{
-    background:#238636;
-    border:none;
-    color:white;
-    padding:10px 18px;
-    border-radius:7px;
-    cursor:pointer;
-    font-weight:600;
-    font-size:0.88rem;
+.create-slider {
+    position: absolute;
+    inset: 0;
+    background: var(--surface-elevated);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-pill);
+    transition: background var(--duration-fast) var(--ease),
+        border-color var(--duration-fast) var(--ease);
 }
 
-.create-btn:hover{
-    background:#2ea043;
+.create-slider::before {
+    content: "";
+    position: absolute;
+    top: 2px;
+    left: 2px;
+    width: 14px;
+    height: 14px;
+    background: var(--text-muted);
+    border-radius: 50%;
+    transition: transform var(--duration-fast) var(--ease),
+        background var(--duration-fast) var(--ease);
 }
 
-.create-repo-error{
-    color:#ff7b72;
-    font-size:0.88rem;
+.create-switch input:checked + .create-slider {
+    background: var(--accent);
+    border-color: var(--accent);
 }
 
-.create-switch{
-    position:relative;
-    display:inline-block;
-    width:44px;
-    height:24px;
+.create-switch input:checked + .create-slider::before {
+    transform: translateX(16px);
+    background: #fff;
 }
 
-.create-switch input{
-    opacity:0;
-    width:0;
-    height:0;
+.create-switch input:focus-visible + .create-slider {
+    box-shadow: var(--accent-ring);
 }
 
-.create-slider{
-    position:absolute;
-    cursor:pointer;
-    top:0;
-    left:0;
-    right:0;
-    bottom:0;
-    background:#30363d;
-    border-radius:30px;
-    transition:.3s;
+/* ---- Error message ----------------------------------------------------- */
+
+.create-repo-error {
+    margin: 0;
+    padding: var(--space-md) var(--space-lg);
+    background: var(--danger-soft);
+    border: 1px solid var(--danger-border);
+    border-radius: var(--radius-lg);
+    font-size: var(--fs-sm);
+    font-weight: 500;
+    color: var(--danger);
+    line-height: 1.4;
 }
 
-.create-slider:before{
-    position:absolute;
-    content:"";
-    height:18px;
-    width:18px;
-    left:3px;
-    bottom:3px;
-    background:white;
-    border-radius:50%;
-    transition:.3s;
+/* ---- Action buttons ---------------------------------------------------- */
+
+.create-repo-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: var(--space-sm);
+    padding-top: var(--space-md);
+    border-top: 1px solid var(--border-subtle);
 }
 
-.create-switch input:checked + .create-slider{
-    background:#238636;
+.create-cancel-btn {
+    font-size: var(--fs-sm) !important;
+    height: 30px !important;
+    padding: 0 var(--space-lg) !important;
 }
 
-.create-switch input:checked + .create-slider:before{
-    transform:translateX(20px);
+.create-btn {
+    font-size: var(--fs-sm) !important;
+    height: 30px !important;
+    padding: 0 var(--space-xl) !important;
+}
+
+/* ---- Responsive -------------------------------------------------------- */
+
+@media (max-width: 600px) {
+    .create-repo-page {
+        padding: var(--space-lg) var(--space-md);
+    }
+
+    .create-repo-name-wrapper {
+        flex-wrap: wrap;
+    }
+
+    .create-slash {
+        display: none;
+    }
+
+    .create-repo-input-box {
+        width: 100%;
+    }
+
+    .owner-display {
+        width: 100%;
+    }
+
+    .create-config-card {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--space-md);
+    }
+
+    .create-config-right {
+        width: 100%;
+    }
+
+    .create-config-right > * {
+        width: 100%;
+    }
+}
+
+/* ============================================================================
+   GitHub Commits & Diff High-Fidelity
+   ========================================================================== */
+
+.gh-commits-view {
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+}
+
+/* ---- Create Commit Section ------------------------------------------------ */
+
+.gh-commit-create {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.gh-commit-create-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.gh-commit-create-header h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--text-strong);
+    margin: 0;
+}
+
+.gh-commit-change-summary {
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.gh-commit-change-list {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 8px;
+}
+
+.gh-commit-file-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: var(--text-primary);
+}
+
+.gh-commit-status {
+    width: 16px;
+    text-align: center;
+    font-weight: 700;
+}
+
+.gh-commit-status-a { color: #3fb950; }
+.gh-commit-status-m { color: #d29922; }
+.gh-commit-status-d { color: #f85149; }
+
+.gh-commit-change-more {
+    font-size: 11px;
+    color: var(--text-muted);
+    text-align: center;
+}
+
+.gh-commit-create-form {
+    display: flex;
+    gap: 12px;
+}
+
+.gh-commit-message-input {
+    flex: 1;
+    height: 32px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 0 12px;
+    color: var(--text-strong);
+    font-size: 14px;
+    outline: none;
+}
+
+.gh-commit-submit-btn {
+    background: var(--success);
+    color: white;
+    border: none;
+    padding: 0 16px;
+    border-radius: 6px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.gh-commit-msg-status {
+    font-size: 12px;
+    text-align: center;
+}
+
+.gh-commit-msg-status.success { color: #3fb950; }
+.gh-commit-msg-status.error { color: #f85149; }
+
+/* ---- Commit History List ------------------------------------------------ */
+
+.gh-commit-history-header {
+    margin-bottom: 16px;
+}
+
+.gh-commit-history-header h3 {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-strong);
+}
+
+.gh-commit-list {
+    display: flex;
+    flex-direction: column;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+}
+
+.gh-commit-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    background: transparent;
+    border-left: none;
+    border-right: none;
+    cursor: pointer;
+    text-align: left;
+    width: 100%;
+    transition: background 0.2s ease;
+}
+
+.gh-commit-row:last-child {
+    border-bottom: none;
+}
+
+.gh-commit-row:hover {
+    background: var(--surface-hover);
+}
+
+.gh-commit-row-main {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.gh-commit-row-id {
+    font-family: var(--font-mono);
+    font-size: 13px;
+    color: var(--accent);
+    background: var(--surface-elevated);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid var(--border);
+}
+
+.gh-commit-row-msg {
+    font-size: 14px;
+    color: var(--text-strong);
+    font-weight: 500;
+}
+
+.gh-commit-row-meta {
+    display: flex;
+    gap: 16px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.gh-commit-author {
+    font-weight: 600;
+}
+
+/* ---- Commit Detail / Diff ------------------------------------------------ */
+
+.gh-commit-detail {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.gh-commit-back {
+    background: none;
+    border: none;
+    color: var(--accent);
+    cursor: pointer;
+    font-size: 14px;
+    padding: 0;
+}
+
+.gh-commit-header {
+    border-bottom: 1px solid var(--border);
+    padding-bottom: 16px;
+}
+
+.gh-commit-header-main {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.gh-commit-msg {
+    font-size: 20px;
+    font-weight: 600;
+    color: var(--text-strong);
+    margin: 0;
+}
+
+.gh-commit-header-meta {
+    display: flex;
+    gap: 12px;
+    font-size: 12px;
+    color: var(--text-muted);
+}
+
+.gh-commit-hash {
+    font-family: var(--font-mono);
+    color: var(--accent);
+}
+
+.gh-commit-files {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.gh-diff-container {
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg);
+    overflow: hidden;
+}
+
+.gh-diff-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 16px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+}
+
+.gh-diff-status {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+}
+
+.gh-diff-status-added { color: #3fb950; }
+.gh-diff-status-modified { color: #d29922; }
+.gh-diff-status-deleted { color: #f85149; }
+
+.gh-diff-path {
+    font-size: 13px;
+    font-family: var(--font-mono);
+    color: var(--text-strong);
+}
+
+.gh-diff-body {
+    font-family: var(--font-mono);
+    font-size: 12px;
+}
+
+.gh-diff-line {
+    display: flex;
+    line-height: 20px;
+}
+
+.gh-diff-line-add {
+    background: rgba(63, 185, 80, 0.1);
+}
+
+.gh-diff-num {
+    width: 40px;
+    text-align: right;
+    padding-right: 12px;
+    color: var(--text-faint);
+    user-select: none;
+}
+
+.gh-diff-content {
+    padding-left: 12px;
+    color: var(--text-primary);
+    white-space: pre;
 }

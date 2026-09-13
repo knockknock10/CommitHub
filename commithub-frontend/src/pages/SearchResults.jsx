@@ -1,7 +1,14 @@
 import { useState, useEffect } from "react";
 import { useSearchParams, Link } from "react-router-dom";
 import DashboardLayout from "../components/dashboard/DashboardLayout";
+import StateBlock from "../components/ui/StateBlock";
 import { globalSearch } from "../api/searchApi";
+import {
+    RepoIcon,
+    UserIcon,
+    BuildingIcon,
+    SearchIcon,
+} from "../components/ui/icons";
 
 import "../styles/search.css";
 
@@ -10,10 +17,10 @@ const SearchResults = () => {
     const query = searchParams.get("q") || "";
     const currentType = searchParams.get("type") || "all";
 
-    const [results, setResults] = useState({ 
-        repositories: [], 
-        users: [], 
-        organizations: [] 
+    const [results, setResults] = useState({
+        repositories: [],
+        users: [],
+        organizations: []
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
@@ -43,7 +50,10 @@ const SearchResults = () => {
                 }
             } catch (err) {
                 if (isMounted) {
-                    setError(err.response?.data?.message || "Search failed. Please try again.");
+                    setError(
+                        err.response?.data?.message ||
+                            "Search failed. Please try again."
+                    );
                 }
             } finally {
                 if (isMounted) {
@@ -59,6 +69,30 @@ const SearchResults = () => {
         };
     }, [query, currentType]);
 
+    const runSearch = () => {
+        const performSearch = async () => {
+            setLoading(true);
+            setError("");
+            try {
+                const data = await globalSearch(query, currentType);
+                setResults({
+                    repositories: data.repositories || [],
+                    users: data.users || [],
+                    organizations: data.organizations || [],
+                });
+                setTotalCount(data.total || 0);
+            } catch (err) {
+                setError(
+                    err.response?.data?.message ||
+                        "Search failed. Please try again."
+                );
+            } finally {
+                setLoading(false);
+            }
+        };
+        performSearch();
+    };
+
     const handleTypeChange = (type) => {
         setSearchParams({ q: query, type });
     };
@@ -72,126 +106,160 @@ const SearchResults = () => {
 
     return (
         <DashboardLayout>
-            <div className="search-results-page">
+            <div className="search-page">
                 <header className="search-header">
-                    <h1>Search results</h1>
-                    <p>
+                    <h1>Search</h1>
+                    <p className="dashboard-header-sub">
                         {query
-                            ? `${totalCount} result${totalCount !== 1 ? "s" : ""} found for "${query}"`
+                            ? `${totalCount} result${
+                                  totalCount !== 1 ? "s" : ""
+                              } found for "${query}"`
                             : "Enter a search query to find content on CommitHub."}
                     </p>
                 </header>
 
-                <nav className="search-filters">
+                <div className="search-type-tabs" role="tablist">
                     {filterTypes.map((type) => (
-                        <button 
-                            key={type.id} 
-                            className={`filter-tab ${currentType === type.id ? "active" : ""}`}
+                        <button
+                            key={type.id}
+                            className={`search-type-tab ${
+                                currentType === type.id ? "active" : ""
+                            }`}
                             onClick={() => handleTypeChange(type.id)}
                         >
                             {type.label}
                         </button>
                     ))}
-                </nav>
+                </div>
 
-                {loading && <div className="search-empty"><p>Searching for results...</p></div>}
+                {loading && (
+                    <StateBlock
+                        variant="loading"
+                        message="Searching for results..."
+                    />
+                )}
 
-                {error && <div className="search-empty"><p>{error}</p></div>}
+                {error && (
+                    <StateBlock
+                        variant="error"
+                        message={error}
+                        retry={runSearch}
+                    />
+                )}
 
                 {!loading && !error && query && totalCount === 0 && (
                     <div className="search-empty">
-                        <h3>No results found</h3>
-                        <p>Try adjusting your search query or filters to find what you are looking for.</p>
+                        <SearchIcon
+                            size={22}
+                            style={{ color: "var(--text-faint)" }}
+                        />
+                        <p>No results found</p>
+                        <span>
+                            Try adjusting your query or filter to find what
+                            you're looking for.
+                        </span>
                     </div>
                 )}
 
                 {!loading && !error && (
-                    <div className="result-groups">
-                        {/* Repositories */}
-                        {(currentType === "all" || currentType === "repositories") && results.repositories.length > 0 && (
-                            <div className="result-group">
-                                <h2>Repositories</h2>
-                                <div className="result-list">
+                    <div className="search-results">
+                        {(currentType === "all" ||
+                            currentType === "repositories") &&
+                            results.repositories.length > 0 && (
+                                <div className="search-result-group">
+                                    <div className="search-result-group-label">
+                                        Repositories
+                                    </div>
                                     {results.repositories.map((repo) => (
-                                        <div className="result-card" key={repo.id}>
-                                            <div className="result-main">
-                                                <div className="result-title-row">
-                                                    <Link to={`/repo/${repo.id}`} className="result-title">
-                                                        {repo.name}
-                                                    </Link>
-                                                    <span className="result-badge">{repo.visibility}</span>
-                                                </div>
-                                                <p className="result-description">{repo.description || "No description provided."}</p>
-                                                <div className="result-meta">
-                                                    <span>&#9733; {repo.stars || 0}</span>
-                                                    <span>forks {repo.forks || 0}</span>
-                                                </div>
+                                        <Link
+                                            to={`/repository/${repo.id}`}
+                                            className="search-result-item"
+                                            key={repo.id}
+                                        >
+                                            <span className="search-result-icon repo">
+                                                <RepoIcon size={15} />
+                                            </span>
+                                            <div className="search-result-body">
+                                                <span className="search-result-name mono">
+                                                    {repo.name}
+                                                </span>
+                                                <span className="search-result-sub">
+                                                    {repo.description ||
+                                                        "No description provided."}
+                                                </span>
                                             </div>
-                                            <Link
-                                                to={`/repo/${repo.id}`}
-                                                className="result-action-btn"
-                                            >
-                                                Open
-                                            </Link>
-                                        </div>
+                                            <span className="search-result-type">
+                                                repo
+                                            </span>
+                                        </Link>
                                     ))}
                                 </div>
-                            </div>
-                        )}
+                            )}
 
-                        {/* Users */}
-                        {(currentType === "all" || currentType === "users") && results.users.length > 0 && (
-                            <div className="result-group">
-                                <h2>Users</h2>
-                                <div className="result-list">
+                        {(currentType === "all" || currentType === "users") &&
+                            results.users.length > 0 && (
+                                <div className="search-result-group">
+                                    <div className="search-result-group-label">
+                                        Users
+                                    </div>
                                     {results.users.map((user) => (
-                                        <div className="result-card" key={user.id}>
-                                            <div className="result-main">
-                                                <div className="result-title-row">
-                                                    <Link to={`/profile/${user.id}`} className="result-title">
-                                                        {user.userName}
-                                                    </Link>
-                                                </div>
-                                                <p className="result-description">{user.email || "No email provided."}</p>
+                                        <Link
+                                            to={`/profile/${user.id}`}
+                                            className="search-result-item"
+                                            key={user.id}
+                                        >
+                                            <span className="search-result-icon user">
+                                                <UserIcon size={15} />
+                                            </span>
+                                            <div className="search-result-body">
+                                                <span className="search-result-name">
+                                                    {user.name ||
+                                                        user.userName}
+                                                </span>
+                                                <span className="search-result-sub">
+                                                    @{user.userName}
+                                                </span>
                                             </div>
-                                            <Link
-                                                to={`/profile/${user.id}`}
-                                                className="result-action-btn"
-                                            >
-                                                View Profile
-                                            </Link>
-                                        </div>
+                                            <span className="search-result-type">
+                                                user
+                                            </span>
+                                        </Link>
                                     ))}
                                 </div>
-                            </div>
-                        )}
+                            )}
 
-                        {/* Organizations */}
-                        {(currentType === "all" || currentType === "organizations") && results.organizations.length > 0 && (
-                            <div className="result-group">
-                                <h2>Organizations</h2>
-                                <div className="result-list">
+                        {(currentType === "all" ||
+                            currentType === "organizations") &&
+                            results.organizations.length > 0 && (
+                                <div className="search-result-group">
+                                    <div className="search-result-group-label">
+                                        Organizations
+                                    </div>
                                     {results.organizations.map((org) => (
-                                        <div className="result-card" key={org.id}>
-                                            <div className="result-main">
-                                                <div className="result-title-row">
-                                                    <Link to={`/organization/${org.slug}`} className="result-title">
-                                                        {org.name}
-                                                    </Link>
-                                                </div>
-                                                <p className="result-description">{org.description || "No description provided."}</p>
+                                        <Link
+                                            to={`/organization/${org.slug}`}
+                                            className="search-result-item"
+                                            key={org.id}
+                                        >
+                                            <span className="search-result-icon org">
+                                                <BuildingIcon size={15} />
+                                            </span>
+                                            <div className="search-result-body">
+                                                <span className="search-result-name">
+                                                    {org.name}
+                                                </span>
+                                                <span className="search-result-sub">
+                                                    {org.description ||
+                                                        "No description provided."}
+                                                </span>
                                             </div>
-                                            <Link
-                                                to={`/organization/${org.slug}`}
-                                                className="result-action-btn"
-                                            >
-                                                View Organization
-                                            </Link>
-                                        </div>
+                                            <span className="search-result-type">
+                                                org
+                                            </span>
+                                        </Link>
                                     ))}
                                 </div>
-                            </div>
-                        )}
+                            )}
                     </div>
                 )}
             </div>

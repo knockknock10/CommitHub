@@ -4,10 +4,14 @@
   "description": "CommitHub – A lightweight personal version control system for managing commits, branches, and merges with a local and collaborative workflow. Designed to teach and demonstrate Git-like functionality in a clean, developer-friendly CLI.",
   "main": "server.js",
   "type": "module",
+  "bin": {
+    "ch": "./cli/ch.js"
+  },
   "scripts": {
     "dev": "nodemon server.js",
     "start": "node server.js",
-    "test": "node --test tests/*.test.js"
+    "test": "node --test tests/*.test.js",
+    "ch": "node cli/ch.js"
   },
   "keywords": [
     "version-control",
@@ -35,6 +39,7 @@
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.3.1",
     "socket.io": "^4.8.3",
+    "socket.io-client": "^4.8.3",
     "uuid": "^13.0.0",
     "yargs": "^18.0.0"
   }

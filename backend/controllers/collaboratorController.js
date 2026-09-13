@@ -1,12 +1,44 @@
 import mongoose from "mongoose";
 import Collaborator, { COLLABORATOR_ROLES } from "../models/collaboratorModel.js";
 import User from "../models/userModel.js";
+import Repository from "../models/repoModel.js";
+import OrganizationMembership from "../models/organizationMembershipModel.js";
 import { authorizeRepository, authorizeRepositoryPermission } from "../utils/repoAccess.js";
-import { PERMISSIONS, getRolePermissions } from "../utils/permissionService.js";
-import { createNotification } from "../utils/notificationService.js";
-import { createActivity } from "../utils/activityService.js";
+import { PERMISSIONS, getRolePermissions } from "../services/permissionService.js";
+import { createNotification } from "../services/notificationService.js";
+import { createActivity } from "../services/activityService.js";
 import { emitDomainEvent } from "../utils/domainEvents.js";
 import { RT_EVENT } from "../realtime/eventTypes.js";
+
+/* my repositories list endpoint (new) */
+export const getCollaboratingRepositories = async (req, res) => {
+    try {
+        const perms = await Collaborator.find({ user: req.user._id })
+            .select("repository role")
+            .lean();
+
+        const repoIds = perms.map(p => p.repository);
+        const repos = await Repository.find({ _id: { $in: repoIds } })
+            .populate("owner", "userName email")
+            .select("name description owner visibility stars forks private")
+            .lean();
+
+        const roleByRepo = Object.fromEntries(
+            perms.map(p => [String(p.repository), p.role])
+        );
+
+        return res.status(200).json(
+            repos.map(repo => ({
+                ...repo,
+                userRole: roleByRepo[String(repo._id)] || null
+            }))
+        );
+    } catch (error) {
+        return res.status(500).json({
+            message: "Server error"
+        });
+    }
+};
 
 export const getCollaborators = async (req, res) => {
     try {
@@ -90,17 +122,9 @@ export const addCollaborator = async (req, res) => {
             .populate("user", "userName email")
             .populate("invitedBy", "userName");
 
-        createNotification({
-            recipient: userId,
-            actor: req.user._id,
-            type: "PR_CREATED",
-            repository: auth.repository._id,
-            message: `You were added as a collaborator (${role}) on ${auth.repository.name}`
-        }).catch(() => {});
-
         createActivity({
             actor: req.user._id,
-            type: "ISSUE_CREATED",
+            type: "COLLABORATOR_ADDED",
             repository: auth.repository._id,
             metadata: {
                 action: "collaborator_added",
@@ -195,6 +219,17 @@ export const updateCollaborator = async (req, res) => {
             }
         });
 
+        createActivity({
+            actor: req.user._id,
+            type: "COLLABORATOR_UPDATED",
+            repository: auth.repository._id,
+            metadata: {
+                action: "collaborator_updated",
+                targetUser: userId,
+                role
+            }
+        }).catch(() => {});
+
         return res.status(200).json(populated);
     } catch (error) {
         return res.status(500).json({
@@ -234,20 +269,26 @@ export const removeCollaborator = async (req, res) => {
             });
         }
 
-        const populated = await Collaborator.findById(collaborator._id)
-            .populate("user", "userName email")
-            .populate("invitedBy", "userName");
-
         emitDomainEvent(RT_EVENT.COLLABORATOR_REMOVED, {
             repository: auth.repository._id.toString(),
             collaborator: {
-                _id: populated._id,
-                user: populated.user,
-                role: populated.role,
-                invitedBy: populated.invitedBy,
-                createdAt: populated.createdAt
+                _id: collaborator._id,
+                userId: collaborator.user,
+                role: collaborator.role,
+                invitedBy: collaborator.invitedBy,
+                createdAt: collaborator.createdAt
             }
         });
+
+        createActivity({
+            actor: req.user._id,
+            type: "COLLABORATOR_REMOVED",
+            repository: auth.repository._id,
+            metadata: {
+                action: "collaborator_removed",
+                targetUser: userId
+            }
+        }).catch(() => {});
 
         return res.status(200).json({
             message: "Collaborator removed"
@@ -277,7 +318,15 @@ export const getMyCollaboratorRole = async (req, res) => {
             });
         }
 
-        const isOwner = repository.owner.toString() === req.user._id.toString();
+        const isOwner =
+            (repository.owner &&
+                repository.owner.toString() === req.user._id.toString()) ||
+            (repository.organization &&
+                await OrganizationMembership.exists({
+                    organization: repository.organization,
+                    user: req.user._id,
+                    role: { $in: ["OWNER", "ADMIN"] }
+                }));
 
         if (isOwner) {
             return res.status(200).json({ role: "owner" });

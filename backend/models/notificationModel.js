@@ -14,7 +14,8 @@ export const NOTIFICATION_TYPES = [
     "PR_REOPENED",
     "MENTION",
     "REPOSITORY_STARRED",
-    "RELEASE_PUBLISHED"
+    "RELEASE_PUBLISHED",
+    "REPOSITORY_FORKED"
 ];
 
 const NotificationSchema = new mongoose.Schema(

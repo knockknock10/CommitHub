@@ -1,5 +1,9 @@
 import { useState } from "react";
 import { createIssue } from "../../api/issueApi";
+import Button from "../ui/Button";
+import Input from "../ui/Input";
+import Textarea from "../ui/Textarea";
+import Select from "../ui/Select";
 import "../../styles/issue.css";
 
 const CreateIssue = ({
@@ -58,7 +62,8 @@ const CreateIssue = ({
 
             <form onSubmit={handleSubmit}>
 
-                <input
+                <Input
+                    label="Title"
                     type="text"
                     placeholder="Issue title"
                     value={title}
@@ -70,7 +75,8 @@ const CreateIssue = ({
                     required
                 />
 
-                <textarea
+                <Textarea
+                    label="Description"
                     placeholder="Issue description"
                     value={description}
                     onChange={(e) =>
@@ -81,49 +87,40 @@ const CreateIssue = ({
                     required
                 />
 
-                <select
+                <Select
+                    label="Label"
                     value={label}
                     onChange={(e) =>
                         setLabel(
                             e.target.value
                         )
                     }
-                >
-
-                    <option value="bug">
-                        Bug
-                    </option>
-
-                    <option value="enhancement">
-                        Enhancement
-                    </option>
-
-                    <option value="documentation">
-                        Documentation
-                    </option>
-
-                    <option value="question">
-                        Question
-                    </option>
-
-                </select>
+                    options={[
+                        { value: "bug", label: "Bug" },
+                        { value: "enhancement", label: "Enhancement" },
+                        { value: "documentation", label: "Documentation" },
+                        { value: "question", label: "Question" },
+                    ]}
+                />
 
                 {error && (
-                    <p>
+                    <p className="ui-input-error">
                         {error}
                     </p>
                 )}
 
-                <button
+                <Button
                     type="submit"
                     disabled={loading}
+                    loading={loading}
+                    variant="primary"
                 >
                     {
                         loading
                         ? "Creating..."
                         : "Create Issue"
                     }
-                </button>
+                </Button>
 
             </form>
 

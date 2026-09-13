@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import Activity, {
     ACTIVITY_TYPES
 } from "../models/activityModel.js";
@@ -66,7 +67,11 @@ const runActivityQuery = async (query, page, limit) => {
     const [activities, total] = await Promise.all([
         Activity.find(query)
             .populate("actor", "userName email")
-            .populate("repository", "name visibility")
+            .populate({
+                path: "repository",
+                select: "name visibility",
+                populate: { path: "owner", select: "userName" }
+            })
             .populate("issue", "title")
             .populate("pullRequest", "number title")
             .populate("release", "title tagName")
@@ -95,6 +100,19 @@ export const getGlobalActivity = async (req, res) => {
             return res.status(400).json({
                 message: parsed.error
             });
+        }
+
+        /* optional actor filter: a given user's activity, still restricted
+           to repositories the requester is allowed to see so private
+           repository activity never leaks through a profile feed. */
+        if (req.query.actor) {
+            if (!mongoose.Types.ObjectId.isValid(req.query.actor)) {
+                return res.status(400).json({
+                    message: "Invalid actor"
+                });
+            }
+
+            parsed.query.actor = req.query.actor;
         }
 
         const visibleIds = await getVisibleRepositoryIds(req.user._id);

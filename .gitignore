@@ -1,8 +1,7 @@
 # CommitHub internal folder
 .CommitHub/
 
-# Local design docs (not tracked)
-docs/
+# Build artifacts and config
 node_modules/
 logs
 .env
@@ -11,3 +10,7 @@ dist/
 build/
 coverage/
 .npm
+BUGS_FOUND.md
+continue.json
+docs
+commithub-frontend/

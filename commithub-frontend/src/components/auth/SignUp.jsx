@@ -1,19 +1,7 @@
-import {
-    useState
-} from "react";
-
-import {
-    useNavigate
-} from "react-router-dom";
-
-import {
-    signupUser
-} from "../../api/authApi";
-
-import {
-    useAuth
-} from "../../context/AuthContext";
-
+import { useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
+import { signupUser } from "../../api/authApi";
+import { useAuth } from "../../context/AuthContext";
 import "./auth.css";
 
 const SignUp = () => {
@@ -30,10 +18,7 @@ const SignUp = () => {
 
     const handleChange = (e) => {
         const { name, value } = e.target;
-        setFormData((prev) => ({
-            ...prev,
-            [name]: value
-        }));
+        setFormData((prev) => ({ ...prev, [name]: value }));
     };
 
     const handleSubmit = async (e) => {
@@ -50,105 +35,79 @@ const SignUp = () => {
                 email: formData.email,
                 password: formData.password
             });
-
-            login(data);
+            login({ ...data.user, token: data.token });
             navigate("/dashboard");
-        } catch (error) {
-            setError(error.response?.data?.message || "Signup failed");
+        } catch (err) {
+            setError(err.response?.data?.message || "Signup failed");
         } finally {
             setLoading(false);
         }
     };
 
     return (
-        <div className="page">
-            <div className="signup-container">
-                <h1 className="brand">
-                    CommitHub
-                </h1>
-                <h2 className="title">
-                    Create your account.
-                </h2>
-                <p className="subtitle">
-                    Build repositories,
-                    manage commits,
-                    and collaborate faster.
-                </p>
-                <p className="signin">
-                    Already have an account?
-                    <a href="/login">
-                        {" "}Sign in →
-                    </a>
-                </p>
-                <form
-                    className="form"
-                    onSubmit={handleSubmit}
-                >
-                    <div className="input-group">
+        <div className="auth-page">
+            <div className="auth-container">
+                <div className="auth-brand">
+                    <div className="auth-logo">◉</div>
+                    <h1 className="auth-title">Create your account</h1>
+                </div>
+                
+                <p className="auth-subtitle">Join CommitHub to start building and collaborating.</p>
+
+                <form className="auth-form" onSubmit={handleSubmit}>
+                    <div className="auth-input-group">
+                        <label className="auth-input-label">Username</label>
                         <input
                             type="text"
                             name="userName"
+                            className="auth-input"
                             value={formData.userName}
                             onChange={handleChange}
                             required
                         />
-                        <label>
-                            Username
-                        </label>
                     </div>
-                    <div className="input-group">
+                    <div className="auth-input-group">
+                        <label className="auth-input-label">Email address</label>
                         <input
                             type="email"
                             name="email"
+                            className="auth-input"
                             value={formData.email}
                             onChange={handleChange}
                             required
                         />
-                        <label>
-                            Email address
-                        </label>
                     </div>
-                    <div className="input-group">
+                    <div className="auth-input-group">
+                        <label className="auth-input-label">Password</label>
                         <input
                             type="password"
                             name="password"
+                            className="auth-input"
                             value={formData.password}
                             onChange={handleChange}
                             required
                         />
-                        <label>
-                            Password
-                        </label>
                     </div>
-                    <div className="input-group">
+                    <div className="auth-input-group">
+                        <label className="auth-input-label">Confirm password</label>
                         <input
                             type="password"
                             name="confirmPassword"
+                            className="auth-input"
                             value={formData.confirmPassword}
                             onChange={handleChange}
                             required
                         />
-                        <label>
-                            Confirm password
-                        </label>
                     </div>
-                    {error && (
-                        <p className="auth-error">
-                            {error}
-                        </p>
-                    )}
-                    <button
-                        className="btn"
-                        type="submit"
-                        disabled={loading}
-                    >
-                        {
-                            loading
-                            ? "Creating account..."
-                            : "Create CommitHub account"
-                        }
+                    {error && <p className="auth-error">{error}</p>}
+                    <button className="auth-submit-btn" type="submit" disabled={loading}>
+                        {loading ? "Creating account..." : "Create account"}
                     </button>
                 </form>
+
+                <div className="auth-footer">
+                    Already have an account? <Link to="/login">Sign in</Link>
+                </div>
             </div>
         </div>
     );

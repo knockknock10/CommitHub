@@ -118,6 +118,39 @@ const getHeadCommitId = async (vcRoot) => {
     }
 };
 
+const sanitizeRelativePath = (root, relative) => {
+    const trimmed = relative.trim();
+
+    if (trimmed === "") {
+        return null;
+    }
+
+    if (
+        trimmed.startsWith("/") ||
+        trimmed.startsWith("\\") ||
+        /^[a-zA-Z]:/.test(trimmed)
+    ) {
+        return null;
+    }
+
+    if (trimmed.split(/[\\/]+/).includes("..")) {
+        return null;
+    }
+
+    const resolved = path.join(root, ...trimmed.split(/[\\/]+/));
+    const relative2 = path.relative(root, resolved);
+
+    if (
+        relative2 === ".." ||
+        relative2.startsWith(".." + path.sep) ||
+        path.isAbsolute(relative2)
+    ) {
+        return null;
+    }
+
+    return resolved;
+};
+
 const collectFiles = async (dir, base, skip) => {
     const results = [];
     const entries = await fs.promises.readdir(
@@ -270,7 +303,11 @@ const createCommit = async (repoRoot, { message, author }) => {
 
     try {
         for (const file of workingFiles) {
-            const source = path.join(repoRoot, file);
+            const sanitized = sanitizeRelativePath(repoRoot, file);
+            if (!sanitized) {
+                continue;
+            }
+            const source = sanitized;
             const target = path.join(snapshotDir, file);
 
             await fs.promises.mkdir(

@@ -1,111 +1,353 @@
-/* :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --code-bg: #f4f3ec;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --social-bg: rgba(244, 243, 236, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+/* ============================================================================
+   CommitHub — Global Design System
+   "GitHub Professional" — Carbon graphite, signal blue, instrument density.
+   A developer platform designed for precision and scale.
+   ========================================================================== */
 
-  --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
-  --mono: ui-monospace, Consolas, monospace;
+:root {
+    color-scheme: dark;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
-  color: var(--text);
-  background: var(--bg);
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+    /* ------------------------------------------------------------------
+       IDENTITY — GitHub Professional Dark
+       ------------------------------------------------------------------ */
 
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
+    /* ---- Surfaces ---------------------------------------------------- */
+    --bg: #0d1117;
+    --surface: #161b22;
+    --surface-elevated: #21262d;
+    --surface-hover: #1c2128;
+    --surface-active: #30363d;
+    --border-subtle: #21262d;
+    --border: #30363d;
+    --border-strong: #444c56;
+
+    /* ---- Text --------------------------------------------------------- */
+    --text: #8b949e;
+    --text-primary: #c9d1d9;
+    --text-strong: #f0f6fc;
+    --text-muted: #8b949e;
+    --text-faint: #484f58;
+
+    /* ---- Brand accent — GitHub Blue ----------------------------------- */
+    --accent: #58a6ff;
+    --accent-hover: #79c0ff;
+    --accent-active: #1f6feb;
+    --accent-soft: rgba(88, 166, 255, 0.1);
+    --accent-soft-strong: rgba(88, 166, 255, 0.2);
+    --accent-border: rgba(88, 166, 255, 0.3);
+    --accent-ring: 0 0 0 3px rgba(88, 166, 255, 0.15);
+
+    /* ---- Semantic ----------------------------------------------------- */
+    --success: #238636;
+    --success-hover: #2ea043;
+    --success-soft: rgba(35, 134, 54, 0.1);
+    --success-border: rgba(35, 134, 54, 0.3);
+    --warning: #d29922;
+    --warning-hover: #e3b341;
+    --warning-soft: rgba(210, 153, 34, 0.1);
+    --warning-border: rgba(210, 153, 34, 0.3);
+    --danger: #da3633;
+    --danger-hover: #f85149;
+    --danger-soft: rgba(218, 54, 51, 0.1);
+    --danger-border: rgba(218, 54, 51, 0.3);
+    --info: #388bfd;
+    --info-soft: rgba(56, 139, 253, 0.1);
+    --merged: #bc8cff;
+    --merged-soft: rgba(188, 140, 255, 0.1);
+
+    /* ---- Primary action buttons --------------------------------------- */
+    --btn-primary-bg: var(--success);
+    --btn-primary-hover: var(--success-hover);
+    --btn-primary-active: #1a6328;
+    --btn-primary-text: #ffffff;
+
+    /* ---- Shape -------------------------------------------------------- */
+    --radius-sm: 3px;
+    --radius: 6px;
+    --radius-lg: 8px;
+    --radius-xl: 12px;
+    --radius-pill: 999px;
+
+    /* ---- Elevation ---------------------------------------------------- */
+    --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.5);
+    --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.6);
+    --shadow-lg: 0 16px 32px rgba(0, 0, 0, 0.7);
+
+    /* ---- Typography --------------------------------------------------- */
+    --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+    --fs-xs: 11px;
+    --fs-sm: 12px;
+    --fs-base: 14px;
+    --fs-md: 14px;
+    --fs-lg: 16px;
+    --fs-xl: 18px;
+    --fs-2xl: 20px;
+    --fs-3xl: 24px;
+
+    /* ---- Spacing ------------------------------------------------------ */
+    --space-xs: 4px;
+    --space-sm: 8px;
+    --space-md: 12px;
+    --space-lg: 16px;
+    --space-xl: 24px;
+    --space-2xl: 32px;
+    --space-3xl: 48px;
+
+    /* ---- Motion ------------------------------------------------------- */
+    --duration-fast: 100ms;
+    --duration-base: 200ms;
+    --ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+    /* ---- Layout ------------------------------------------------------- */
+    --topbar-h: 64px;
+    --sidebar-w: 240px;
+    --sidebar-w-collapsed: 64px;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --code-bg: #1f2028;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --social-bg: rgba(47, 48, 58, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
+/* ---- Base reset -------------------------------------------------------- */
 
-  #social .button-icon {
-    filter: invert(1) brightness(2);
-  }
+*,
+*::before,
+*::after {
+    box-sizing: border-box;
+}
+
+html {
+    height: 100%;
+    -webkit-text-size-adjust: 100%;
 }
 
 body {
-  margin: 0;
+    margin: 0;
+    min-height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--font-sans);
+    font-size: var(--fs-base);
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
 }
 
 #root {
-  width: 1126px;
-  max-width: 100%;
-  margin: 0 auto;
-  text-align: center;
-  border-inline: 1px solid var(--border);
-  min-height: 100svh;
-  display: flex;
-  flex-direction: column;
-  box-sizing: border-box;
+    min-height: 100vh;
 }
 
 h1,
-h2 {
-  font-family: var(--heading);
-  font-weight: 500;
-  color: var(--text-h);
+h2,
+h3,
+h4,
+h5,
+h6,
+p,
+figure,
+blockquote {
+    margin: 0;
 }
 
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-p {
-  margin: 0;
+h1,
+h2,
+h3,
+h4,
+h5,
+h6 {
+    font-weight: 600;
+    color: var(--text-strong);
+    letter-spacing: -0.03em;
 }
 
-code,
-.counter {
-  font-family: var(--mono);
-  display: inline-flex;
-  border-radius: 4px;
-  color: var(--text-h);
+a {
+    color: var(--accent);
+    text-decoration: none;
 }
 
-code {
-  font-size: 15px;
-  line-height: 135%;
-  padding: 4px 8px;
-  background: var(--code-bg);
-} */
+a:hover {
+    color: var(--accent-hover);
+}
+
+button {
+    font-family: inherit;
+}
+
+img,
+svg {
+    vertical-align: middle;
+}
+
+hr {
+    border: none;
+    border-top: 1px solid var(--border-subtle);
+    margin: var(--space-lg) 0;
+}
+
+/* ---- Focus visibility -------------------------------------------------- */
+
+:focus {
+    outline: none;
+}
+
+:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 1px;
+    border-radius: var(--radius-sm);
+}
+
+/* ---- Selection & scrollbar --------------------------------------------- */
+
+::selection {
+    background: var(--accent-soft-strong);
+    color: var(--text-strong);
+}
+
+*::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+*::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+*::-webkit-scrollbar-thumb {
+    background: var(--surface-active);
+    border: 2px solid transparent;
+    border-radius: var(--radius-pill);
+    background-clip: content-box;
+}
+
+*::-webkit-scrollbar-thumb:hover {
+    background: var(--border-strong);
+    border: 2px solid transparent;
+    background-clip: content-box;
+}
+
+/* ---- Reduced motion ---------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.001ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.001ms !important;
+        scroll-behavior: auto !important;
+    }
+}
+
+/* ---- Mono utility ------------------------------------------------------ */
+
+.mono {
+    font-family: var(--font-mono);
+    font-size: 0.9em;
+    letter-spacing: -0.02em;
+}
+
+/* ---- Utility classes --------------------------------------------------- */
+
+.truncate {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sr-only {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0, 0, 0, 0);
+    white-space: nowrap;
+    border: 0;
+}
+
+/* ---- Shared state blocks ------------------------------------------------ */
+
+.shared-loading,
+.shared-error,
+.shared-empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-md);
+    padding: var(--space-3xl) var(--space-xl);
+    text-align: center;
+}
+
+.shared-loading {
+    color: var(--text-muted);
+}
+
+.shared-loading::before {
+    content: "";
+    width: 24px;
+    height: 24px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+.shared-empty-state {
+    color: var(--text-muted);
+    padding: var(--space-3xl) var(--space-2xl);
+}
+
+.shared-empty-state p {
+    max-width: 320px;
+    line-height: 1.6;
+}
+
+.shared-error {
+    color: var(--danger);
+}
+
+.state-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--accent);
+    background: var(--accent-soft);
+    border: 1px solid var(--accent-border);
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all var(--duration-fast) var(--ease);
+}
+
+.state-btn:hover {
+    background: var(--accent-soft-strong);
+    color: var(--accent-hover);
+}
+
+.state-btn-primary {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 14px;
+    font-size: var(--fs-sm);
+    font-weight: 600;
+    color: var(--btn-primary-text);
+    background: var(--btn-primary-bg);
+    border: none;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: all var(--duration-fast) var(--ease);
+}
+
+.state-btn-primary:hover {
+    background: var(--btn-primary-hover);
+}
+
+@keyframes spin {
+    to {
+        transform: rotate(360deg);
+    }
+}

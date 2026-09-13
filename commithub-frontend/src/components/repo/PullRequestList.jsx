@@ -1,306 +1,269 @@
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import {
-    createPullRequest,
-    fetchPullRequests
+    PullRequestIcon,
+    GitMergeIcon,
+    CloseIcon,
+    PlusIcon,
+    BranchIcon
+} from "../ui/icons";
+import {
+    fetchPullRequests,
+    createPullRequest
 } from "../../api/repositoryApi";
 import PullRequestDetails from "./PullRequestDetails";
+import "../../styles/pullRequestComponents.css";
 
-const formatDate = (timestamp) => {
-    if (!timestamp) {
-        return "";
-    }
-
-    const date = new Date(timestamp);
-    const seconds = Math.floor((Date.now() - date.getTime()) / 1000);
-
-    if (seconds < 60) {
-        return "just now";
-    }
-
-    if (seconds < 3600) {
-        return `${Math.floor(seconds / 60)} minutes ago`;
-    }
-
-    if (seconds < 86400) {
-        return `${Math.floor(seconds / 3600)} hours ago`;
-    }
-
-    return date.toLocaleDateString();
-};
-
-const PullRequestList = ({ repository, isOwner }) => {
-    const [reload, setReload] = useState(false);
-    const [pullRequests, setPullRequests] = useState([]);
+const PullRequestList = ({ repository, isOwner, initialNumber }) => {
+    const [prs, setPrs] = useState([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState("");
     const [filter, setFilter] = useState("open");
-    const [message, setMessage] = useState("");
-    const [messageType, setMessageType] = useState("");
-    const [showCreate, setShowCreate] = useState(false);
-    const [creating, setCreating] = useState(false);
-    const [createForm, setCreateForm] = useState({
-        sourceBranch: repository.branches?.[1] || "",
-        targetBranch: repository.branches?.[0] || "main",
+    const [showForm, setShowForm] = useState(false);
+
+    const defaultBranches = () => {
+        const branches = repository?.branches || [];
+        if (branches.length === 0) return { sourceBranch: "", targetBranch: "" };
+        if (branches.length === 1) {
+            return { sourceBranch: branches[0], targetBranch: branches[0] };
+        }
+        const target =
+            branches.find((b) => b === "main") || branches[0];
+        const source = branches.find((b) => b !== target) || branches[1];
+        return { sourceBranch: source, targetBranch: target };
+    };
+
+    const [form, setForm] = useState({
         title: "",
-        description: ""
+        description: "",
+        ...defaultBranches()
     });
-    const [selectedNumber, setSelectedNumber] = useState(null);
+    const [creating, setCreating] = useState(false);
+    const [createError, setCreateError] = useState("");
+
+    const loadPRs = async () => {
+        setLoading(true);
+        setError("");
+        try {
+            const data = await fetchPullRequests(repository._id, {});
+            setPrs(data.pullRequests || []);
+        } catch (err) {
+            setError(
+                err.response?.data?.message || "Failed to load pull requests"
+            );
+        } finally {
+            setLoading(false);
+        }
+    };
 
     useEffect(() => {
-        const loadPullRequests = async () => {
-            setLoading(true);
-            setMessage("");
-            setMessageType("");
+        loadPRs();
+    }, [repository._id]);
 
-            try {
-                const data = await fetchPullRequests(
-                    repository._id,
-                    { status: filter }
-                );
-                setPullRequests(data.pullRequests || []);
-            } catch (error) {
-                setMessageType("error");
-                setMessage(
-                    error.response?.data?.message ||
-                    "Failed to load pull requests"
-                );
-            } finally {
-                setLoading(false);
-            }
-        };
-        loadPullRequests();
-    }, [repository._id, filter, reload]);
+    const openCount = prs.filter((pr) => pr.status === "open").length;
+    const closedCount = prs.filter((pr) => pr.status === "closed").length;
+    const mergedCount = prs.filter((pr) => pr.status === "merged").length;
 
-    const branches = repository.branches || [];
+    const visiblePRs = prs.filter(
+        (pr) => filter === "all" || pr.status === filter
+    );
 
-    const handleCreate = async () => {
-        if (createForm.title.trim() === "") {
-            setMessageType("error");
-            setMessage("Title is required");
+    const resetForm = () => {
+        setForm({
+            title: "",
+            description: "",
+            ...defaultBranches()
+        });
+    };
+
+    const handleCreate = async (e) => {
+        e.preventDefault();
+        if (!form.title.trim()) {
+            setCreateError("Title is required");
             return;
         }
-
-        if (
-            createForm.sourceBranch === "" ||
-            createForm.targetBranch === ""
-        ) {
-            setMessageType("error");
-            setMessage("Source and target branches are required");
+        if (!form.sourceBranch || !form.targetBranch) {
+            setCreateError("Source and target branches are required");
             return;
         }
-
-        if (createForm.sourceBranch === createForm.targetBranch) {
-            setMessageType("error");
-            setMessage("Source and target branches must be different");
+        if (form.sourceBranch === form.targetBranch) {
+            setCreateError("Source and target branches must be different");
             return;
         }
-
         setCreating(true);
-        setMessage("");
-        setMessageType("");
-
+        setCreateError("");
         try {
-            const created = await createPullRequest(
-                repository._id,
-                {
-                    sourceBranch: createForm.sourceBranch,
-                    targetBranch: createForm.targetBranch,
-                    title: createForm.title.trim(),
-                    description: createForm.description.trim()
-                }
-            );
-            setShowCreate(false);
-            setCreateForm({
-                sourceBranch: branches[1] || "",
-                targetBranch: branches[0] || "main",
-                title: "",
-                description: ""
+            await createPullRequest(repository._id, {
+                title: form.title.trim(),
+                description: form.description.trim(),
+                sourceBranch: form.sourceBranch,
+                targetBranch: form.targetBranch
             });
-            setSelectedNumber(created.number);
-        } catch (error) {
-            setMessageType("error");
-            setMessage(
-                error.response?.data?.message ||
-                "Failed to create pull request"
+            resetForm();
+            setShowForm(false);
+            await loadPRs();
+        } catch (err) {
+            setCreateError(
+                err.response?.data?.message || "Failed to create pull request"
             );
         } finally {
             setCreating(false);
         }
     };
 
-    if (selectedNumber) {
+    if (initialNumber) {
         return (
             <PullRequestDetails
                 repository={repository}
                 isOwner={isOwner}
-                number={selectedNumber}
-                onBack={() => {
-                    setSelectedNumber(null);
-                    setReload((prev) => !prev);
-                }}
             />
         );
     }
 
+    const branches = repository?.branches || [];
+
     return (
-        <div className="pull-requests-view">
-            <div className="pull-requests-header">
-                <h3>Pull requests</h3>
-                {isOwner && (
+        <div className="gh-pr-container">
+            <div className="gh-pr-toolbar">
+                <div className="gh-pr-tabs">
                     <button
-                        className="pull-request-new-btn"
-                        onClick={() => setShowCreate((prev) => !prev)}
+                        className={`gh-pr-tab ${filter === 'open' ? 'active' : ''}`}
+                        onClick={() => setFilter('open')}
                     >
-                        {showCreate ? "Cancel" : "New pull request"}
+                        <PullRequestIcon size={13} /> Open {openCount}
                     </button>
-                )}
+                    <button
+                        className={`gh-pr-tab ${filter === 'closed' ? 'active' : ''}`}
+                        onClick={() => setFilter('closed')}
+                    >
+                        <CloseIcon size={13} /> Closed {closedCount}
+                    </button>
+                    <button
+                        className={`gh-pr-tab ${filter === 'merged' ? 'active' : ''}`}
+                        onClick={() => setFilter('merged')}
+                    >
+                        <GitMergeIcon size={13} /> Merged {mergedCount}
+                    </button>
+                </div>
+                <div className="gh-pr-actions">
+                    <button
+                        className="gh-pr-new-btn"
+                        onClick={() => setShowForm((prev) => !prev)}
+                    >
+                        <PlusIcon size={14} /> {showForm ? "Close" : "New pull request"}
+                    </button>
+                </div>
             </div>
 
-            {showCreate && (
-                <div className="pull-request-create">
-                    <h4>Create pull request</h4>
-                    <div className="pull-request-create-form">
-                        <div className="pull-request-create-row">
+            {showForm && (
+                <div className="gh-pr-create-wrap">
+                    <form className="gh-pr-create-form" onSubmit={handleCreate}>
+                        <h3>New pull request</h3>
+                        <div className="gh-pr-create-branches">
                             <label>
-                                Source branch
+                                <span>From</span>
                                 <select
-                                    value={createForm.sourceBranch}
+                                    value={form.sourceBranch}
                                     onChange={(e) =>
-                                        setCreateForm({
-                                            ...createForm,
-                                            sourceBranch: e.target.value
-                                        })
+                                        setForm({ ...form, sourceBranch: e.target.value })
                                     }
+                                    className="gh-pr-branch-select"
                                 >
-                                    {branches.map((branch) => (
-                                        <option
-                                            key={branch}
-                                            value={branch}
-                                        >
-                                            {branch}
-                                        </option>
+                                    {branches.map((b) => (
+                                        <option key={b} value={b}>{b}</option>
                                     ))}
                                 </select>
                             </label>
+                            <span className="gh-pr-branch-arrow">→</span>
                             <label>
-                                Target branch
+                                <span>Into</span>
                                 <select
-                                    value={createForm.targetBranch}
+                                    value={form.targetBranch}
                                     onChange={(e) =>
-                                        setCreateForm({
-                                            ...createForm,
-                                            targetBranch: e.target.value
-                                        })
+                                        setForm({ ...form, targetBranch: e.target.value })
                                     }
+                                    className="gh-pr-branch-select"
                                 >
-                                    {branches.map((branch) => (
-                                        <option
-                                            key={branch}
-                                            value={branch}
-                                        >
-                                            {branch}
-                                        </option>
+                                    {branches.map((b) => (
+                                        <option key={b} value={b}>{b}</option>
                                     ))}
                                 </select>
                             </label>
                         </div>
                         <input
-                            className="pull-request-title-input"
+                            className="gh-pr-title-input"
                             type="text"
-                            placeholder="Title"
-                            value={createForm.title}
-                            onChange={(e) =>
-                                setCreateForm({
-                                    ...createForm,
-                                    title: e.target.value
-                                })
-                            }
-                            maxLength={200}
+                            placeholder="Pull request title"
+                            value={form.title}
+                            onChange={(e) => setForm({ ...form, title: e.target.value })}
+                            required
                         />
                         <textarea
-                            className="pull-request-description-input"
-                            placeholder="Description"
-                            value={createForm.description}
-                            onChange={(e) =>
-                                setCreateForm({
-                                    ...createForm,
-                                    description: e.target.value
-                                })
-                            }
-                            rows={4}
+                            className="gh-pr-desc-input"
+                            placeholder="Describe your changes..."
+                            value={form.description}
+                            onChange={(e) => setForm({ ...form, description: e.target.value })}
                         />
-                        <button
-                            className="commit-submit-btn"
-                            onClick={handleCreate}
-                            disabled={creating}
-                        >
-                            {creating
-                                ? "Creating..."
-                                : "Create pull request"}
-                        </button>
-                    </div>
+                        {createError && <p className="gh-pr-form-error">{createError}</p>}
+                        <div className="gh-pr-form-actions">
+                            <button
+                                type="submit"
+                                className="gh-pr-submit-btn"
+                                disabled={creating}
+                            >
+                                {creating ? "Creating..." : "Create pull request"}
+                            </button>
+                        </div>
+                    </form>
                 </div>
             )}
 
-            {message && (
-                <p className={`commit-message ${messageType}`}>
-                    {message}
-                </p>
-            )}
+            {loading && <div className="shared-loading"><p>Loading pull requests...</p></div>}
+            {error && <div className="shared-error"><p>{error}</p></div>}
 
-            <div className="pull-request-filters">
-                {["open", "closed", "merged"].map((state) => (
-                    <button
-                        key={state}
-                        className={
-                            filter === state
-                                ? "pull-request-filter active"
-                                : "pull-request-filter"
-                        }
-                        onClick={() => setFilter(state)}
-                    >
-                        {state.charAt(0).toUpperCase() + state.slice(1)}
-                    </button>
-                ))}
-            </div>
-
-            {loading && <p>Loading pull requests...</p>}
-
-            {!loading && pullRequests.length === 0 && (
-                <p className="commit-empty">No pull requests found.</p>
-            )}
-
-            {!loading && pullRequests.length > 0 && (
-                <div className="pull-request-list">
-                    {pullRequests.map((pullRequest) => (
-                        <button
-                            key={pullRequest.number}
-                            className="pull-request-row"
-                            onClick={() =>
-                                setSelectedNumber(pullRequest.number)
-                            }
-                        >
-                            <div className="pull-request-row-main">
-                                <span className="pull-request-number">
-                                    #{pullRequest.number}
-                                </span>
-                                <span className="pull-request-title">
-                                    {pullRequest.title}
-                                </span>
+            {!loading && !error && (
+                <div className="gh-pr-list">
+                    {visiblePRs.length === 0 ? (
+                        <div className="shared-empty-state">
+                            <p>No {filter} pull requests found.</p>
+                        </div>
+                    ) : (
+                        visiblePRs.map((pr) => (
+                            <div className="gh-pr-item" key={pr._id}>
+                                <div className="gh-pr-item-left">
+                                    <div className={`gh-pr-status-icon ${pr.status}`}>
+                                        {pr.status === "merged" ? (
+                                            <GitMergeIcon size={16} />
+                                        ) : pr.status === "closed" ? (
+                                            <CloseIcon size={16} />
+                                        ) : (
+                                            <PullRequestIcon size={16} />
+                                        )}
+                                    </div>
+                                    <div className="gh-pr-info">
+                                        <Link
+                                            to={`/repository/${repository._id}/pull-request/${pr.number}`}
+                                            className="gh-pr-title"
+                                        >
+                                            {pr.title}
+                                        </Link>
+                                        <div className="gh-pr-meta">
+                                            <span className="gh-pr-meta-item">#{pr.number}</span>
+                                            <span className="gh-pr-meta-item">
+                                                <BranchIcon size={11} /> {pr.sourceBranch} → {pr.targetBranch}
+                                            </span>
+                                            <span className="gh-pr-meta-item">
+                                                opened by {pr.author?.userName || "unknown"}
+                                            </span>
+                                            <span className="gh-pr-meta-item">
+                                                {new Date(pr.createdAt).toLocaleDateString()}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
                             </div>
-                            <div className="pull-request-row-meta">
-                                <span className="pull-request-branches">
-                                    {pullRequest.sourceBranch} →{" "}
-                                    {pullRequest.targetBranch}
-                                </span>
-                                <span>
-                                    {pullRequest.author?.userName || "Unknown"}
-                                </span>
-                                <span>
-                                    {formatDate(pullRequest.createdAt)}
-                                </span>
-                            </div>
-                        </button>
-                    ))}
+                        ))
+                    )}
                 </div>
             )}
         </div>

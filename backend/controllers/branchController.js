@@ -1,6 +1,6 @@
 import { getRepoRoot } from "../utils/repoStorage.js";
 import { authorizeRepository } from "../utils/repoAccess.js";
-import { createActivity } from "../utils/activityService.js";
+import { createActivity } from "../services/activityService.js";
 import {
     createBranch as performCreateBranch,
     checkoutBranch as performCheckoutBranch,

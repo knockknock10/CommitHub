@@ -5,17 +5,10 @@ import ReviewComment from "../models/reviewCommentModel.js";
 import PullRequest from "../models/pullRequestModel.js";
 import Repository from "../models/repoModel.js";
 import { getRepoRoot } from "../utils/repoStorage.js";
-import {
-    ensureVersionControl,
-    getSnapshot
-} from "../utils/repoVersion.js";
+import { ensureVersionControl, getSnapshot } from "../utils/repoVersion.js";
 import { authorizeRepository } from "../utils/repoAccess.js";
-import {
-    createNotification,
-    createMentionNotifications,
-    buildNotificationMessage
-} from "../utils/notificationService.js";
-import { createActivity } from "../utils/activityService.js";
+import { createNotification, createMentionNotifications, buildNotificationMessage } from "../services/notificationService.js";
+import { createActivity } from "../services/activityService.js";
 
 const resolveHeadCommit = async (pullRequest) => {
     if (pullRequest.mergedCommitId) {
@@ -272,7 +265,7 @@ export const createReviewComment = async (req, res) => {
             if (
                 parent &&
                 parent.author._id.toString() !==
-                    req.user._id.toString()
+                req.user._id.toString()
             ) {
                 recipients.add(
                     parent.author._id.toString()

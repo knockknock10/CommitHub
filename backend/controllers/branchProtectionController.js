@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import BranchProtection from "../models/branchProtectionModel.js";
 import { authorizeRepository, authorizeRepositoryPermission } from "../utils/repoAccess.js";
-import { PERMISSIONS } from "../utils/permissionService.js";
+import { PERMISSIONS } from "../services/permissionService.js";
 
 const REQUIRED_APPROVALS_MIN = 1;
 const REQUIRED_APPROVALS_MAX = 10;
@@ -99,16 +99,17 @@ export const updateBranchProtection = async (req, res) => {
         }
 
         const enabled =
-            typeof req.body?.enabled === "boolean"
-                ? req.body.enabled
-                : true;
-
+            req.body?.enabled === "true" || req.body?.enabled === true;
+        
         const dismissStaleReviews =
-            typeof req.body?.dismissStaleReviews === "boolean"
-                ? req.body.dismissStaleReviews
-                : true;
+            req.body?.dismissStaleReviews === "true" || req.body?.dismissStaleReviews === true;
 
         const rawApprovals = req.body?.requiredApprovals;
+        if (typeof rawApprovals === "boolean") {
+            return res.status(400).json({
+                message: "Required approvals must be a number, not a boolean"
+            });
+        }
         const requiredApprovals =
             typeof rawApprovals === "number"
                 ? rawApprovals

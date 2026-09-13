@@ -240,6 +240,7 @@ after(async () => {
     await PullRequest.deleteMany({});
     await Activity.deleteMany({});
     await Notification.deleteMany({});
+    await mongoose.connection.db.dropDatabase();
     await mongoose.disconnect();
     server.close();
     await fs.promises.rm(storageRoot, {

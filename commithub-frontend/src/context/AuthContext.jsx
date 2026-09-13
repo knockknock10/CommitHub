@@ -15,7 +15,15 @@ export const AuthProvider = ({ children }) => {
         const storedUser = localStorage.getItem("commithub-user");
 
         if (storedUser) {
-            setUser(JSON.parse(storedUser));
+            const parsed = JSON.parse(storedUser);
+            // Normalize legacy shape { token, user: { _id, userName, ... } }
+            // to flat shape { _id, userName, token, ... } so Topbar and
+            // other components that read user._id / user.userName work.
+            if (parsed.user && parsed.user._id) {
+                setUser({ ...parsed.user, token: parsed.token });
+            } else {
+                setUser(parsed);
+            }
         }
 
         setLoading(false);

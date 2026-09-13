@@ -1,219 +1,185 @@
-.organization-page {
-    color: #c9d1d9;
+/* ============================================================================
+   Organizations — repository identity
+   ========================================================================== */
+
+.organizations-page {
+    max-width: 1000px;
+    margin: 0 auto;
 }
 
-/* Header */
-.org-header {
-    margin-bottom: 32px;
+.organizations-header {
     display: flex;
-    justify-content: space-between;
-    align-items: flex-start;
-    gap: 20px;
-}
-
-.org-header-main h1 {
-    color: #f0f6fc;
-    font-size: 32px;
-    margin-bottom: 8px;
-}
-
-.org-header-main p {
-    color: #8b949e;
-    font-size: 16px;
-    line-height: 1.5;
-    max-width: 600px;
-}
-
-.org-badge {
-    background: #21262d;
-    border: 1px solid #30363d;
-    color: #8b949e;
-    padding: 4px 12px;
-    border-radius: 20px;
-    font-size: 12px;
-    font-weight: 600;
-}
-
-/* Tabs */
-.org-nav {
-    display: flex;
-    gap: 24px;
-    border-bottom: 1px solid #30363d;
-    margin-bottom: 24px;
-}
-
-.org-tab {
-    background: none;
-    border: none;
-    color: #8b949e;
-    padding: 12px 4px;
-    cursor: pointer;
-    font-size: 14px;
-    font-weight: 500;
-    position: relative;
-    transition: color 0.2s;
-}
-
-.org-tab:hover {
-    color: #f0f6fc;
-}
-
-.org-tab.active {
-    color: #f0f6fc;
-}
-
-.org-tab.active::after {
-    content: "";
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: #f78166;
-}
-
-/* Content Area */
-.org-content {
-    display: flex;
-    flex-direction: column;
-    gap: 24px;
-}
-
-/* Member List */
-.member-list {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-}
-
-.member-card {
-    background: #161b22;
-    border: 1px solid #30363d;
-    border-radius: 12px;
-    padding: 16px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    transition: border-color 0.2s;
-}
-
-.member-card:hover {
-    border-color: #8b949e;
-}
-
-.member-info h3 {
-    color: #58a6ff;
-    font-size: 16px;
-    margin: 0 0 4px 0;
-    text-decoration: none;
-}
-
-.member-info p {
-    color: #8b949e;
-    font-size: 13px;
-    margin: 0;
-}
-
-.member-role {
-    font-size: 12px;
-    padding: 2px 8px;
-    border-radius: 10px;
-    background: #21262d;
-    color: #c9d1d9;
-    border: 1px solid #30363d;
-    margin-left: 12px;
-}
-
-.member-actions {
-    display: flex;
-    gap: 8px;
-}
-
-.btn-remove {
-    background: transparent;
-    border: 1px solid #f85149;
-    color: #f85149;
-    padding: 6px 12px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-size: 12px;
-}
-
-.btn-remove:hover {
-    background: #f85149;
-    color: white;
-}
-
-/* Invitation Form */
-.invite-section {
-    background: #0d1117;
-    border: 1px solid #30363d;
-    border-radius: 12px;
-    padding: 20px;
-    margin-bottom: 24px;
-}
-
-.invite-form {
-    display: flex;
-    gap: 12px;
     align-items: flex-end;
-    flex-wrap: wrap;
+    justify-content: space-between;
+    margin-bottom: var(--space-2xl);
 }
 
-.invite-field {
+.organizations-header h1 {
+    font-size: var(--fs-2xl);
+    letter-spacing: -0.04em;
+}
+
+/* ---- Organization list ------------------------------------------------ */
+
+.organization-list {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: var(--space-sm);
 }
 
-.invite-field label {
-    color: #8b949e;
-    font-size: 12px;
-    font-weight: 500;
+.organization-item {
+    display: flex;
+    align-items: center;
+    gap: var(--space-lg);
+    padding: var(--space-lg);
+    background: var(--surface);
+    border: 1px solid var(--border-subtle);
+    border-radius: var(--radius-lg);
+    text-decoration: none;
+    transition: all var(--duration-fast) var(--ease);
 }
 
-.invite-field input, .invite-field select {
-    background: #161b22;
-    border: 1px solid #30363d;
-    color: #c9d1d9;
-    padding: 8px 12px;
-    border-radius: 6px;
-    outline: none;
+.organization-item:hover {
+    border-color: var(--border-strong);
+    background: var(--surface-hover);
 }
 
-.btn-invite {
-    background: #238636;
-    color: white;
-    border: none;
-    padding: 9px 16px;
-    border-radius: 6px;
-    cursor: pointer;
+.organization-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: var(--radius-lg);
+    background: var(--accent-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 18px;
+    font-weight: 700;
+    color: var(--accent);
+    flex-shrink: 0;
+    border: 1px solid var(--accent-border);
+}
+
+.organization-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.organization-name {
+    font-size: var(--fs-md);
     font-weight: 600;
+    color: var(--text-strong);
+    display: block;
 }
 
-.btn-invite:hover {
-    background: #2ea043;
+.organization-desc {
+    font-size: var(--fs-xs);
+    color: var(--text-faint);
+    display: block;
+    margin-top: 2px;
 }
 
-.btn-invite:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+.organization-meta {
+    display: flex;
+    gap: var(--space-lg);
+    flex-shrink: 0;
 }
 
-/* Empty State */
-.empty-state {
-    text-align: center;
-    padding: 40px;
-    color: #8b949e;
+.organization-meta-item {
+    font-size: 11px;
+    color: var(--text-muted);
+    display: flex;
+    align-items: center;
+    gap: 4px;
 }
 
-/* Responsive */
+/* ---- Organization page ------------------------------------------------ */
+
+.org-page {
+    max-width: 1000px;
+    margin: 0 auto;
+}
+
+.org-header {
+    display: flex;
+    gap: var(--space-2xl);
+    padding-bottom: var(--space-2xl);
+    border-bottom: 1px solid var(--border-subtle);
+    margin-bottom: var(--space-2xl);
+}
+
+.org-avatar {
+    width: 72px;
+    height: 72px;
+    border-radius: var(--radius-lg);
+    background: var(--accent-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--accent);
+    flex-shrink: 0;
+    border: 2px solid var(--accent-border);
+}
+
+.org-info {
+    flex: 1;
+}
+
+.org-name {
+    font-size: var(--fs-2xl);
+    font-weight: 700;
+    color: var(--text-strong);
+    letter-spacing: -0.03em;
+    margin-bottom: 4px;
+}
+
+.org-desc {
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+    line-height: 1.5;
+    margin-bottom: var(--space-md);
+}
+
+.org-stats {
+    display: flex;
+    gap: var(--space-xl);
+}
+
+.org-stat {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+}
+
+.org-stat strong {
+    color: var(--text-strong);
+    font-weight: 600;
+    font-family: var(--font-mono);
+}
+
+/* ---- Responsive ------------------------------------------------------- */
+
 @media (max-width: 768px) {
+    .organization-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .organization-meta {
+        flex-direction: column;
+        gap: var(--space-sm);
+    }
+
     .org-header {
         flex-direction: column;
+        align-items: center;
+        text-align: center;
     }
-    .invite-form {
-        flex-direction: column;
-        align-items: stretch;
+
+    .org-stats {
+        justify-content: center;
     }
 }

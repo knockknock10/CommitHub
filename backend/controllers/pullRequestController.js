@@ -1,7 +1,8 @@
 import PullRequest from "../models/pullRequestModel.js";
 import Repository from "../models/repoModel.js";
 import mongoose from "mongoose";
-import { authorizeRepository } from "../utils/repoAccess.js";
+import { authorizeRepository, authorizeRepositoryPermission, canReadRepository, canWriteRepository } from "../utils/repoAccess.js";
+import { PERMISSIONS } from "../services/permissionService.js";
 import { getRepoRoot } from "../utils/repoStorage.js";
 import {
     getBranchCommitId,
@@ -14,17 +15,20 @@ import {
     computeMergeStatus,
     performMerge
 } from "../utils/diffMerge.js";
+import { computeCrossRepoComparison } from "../utils/crossRepoMerge.js";
 import {
     createNotification,
     createMentionNotifications,
     buildNotificationMessage
-} from "../utils/notificationService.js";
-import { createActivity } from "../utils/activityService.js";
+} from "../services/notificationService.js";
+import { createActivity } from "../services/activityService.js";
 import {
     loadBranchProtection,
     evaluateReviewRequirements,
     buildMergeBlockReasons
 } from "../utils/branchProtection.js";
+import { emitDomainEvent } from "../utils/domainEvents.js";
+import { RT_EVENT } from "../realtime/eventTypes.js";
 
 const TITLE_MAX_LENGTH = 200;
 const REVIEW_COMMENT_MAX_LENGTH = 500;
@@ -123,7 +127,8 @@ export const createPullRequest = async (req, res) => {
         sourceBranch,
         targetBranch,
         title,
-        description
+        description,
+        sourceRepository
     } = req.body || {};
 
     const trimmedSource =
@@ -140,6 +145,46 @@ export const createPullRequest = async (req, res) => {
 
         if (!result) {
             return;
+        }
+
+        let sourceRepo = null;
+
+        if (
+            sourceRepository !== undefined &&
+            sourceRepository !== null &&
+            sourceRepository !== ""
+        ) {
+            if (!mongoose.Types.ObjectId.isValid(sourceRepository)) {
+                return res.status(400).json({
+                    message: "Invalid source repository"
+                });
+            }
+
+            sourceRepo = await Repository.findById(sourceRepository);
+
+            if (!sourceRepo) {
+                return res.status(400).json({
+                    message: "Source repository not found"
+                });
+            }
+
+            if (
+                sourceRepo._id.toString() !==
+                result.repository._id.toString()
+            ) {
+                const canWriteSource = await canWriteRepository(
+                    req.user._id,
+                    sourceRepo
+                );
+
+                if (!canWriteSource) {
+                    return res.status(403).json({
+                        message: "You do not have access to the source repository"
+                    });
+                }
+            } else {
+                sourceRepo = null;
+            }
         }
 
         const trimmedTitle =
@@ -179,8 +224,12 @@ export const createPullRequest = async (req, res) => {
             result.repository._id
         );
 
+        const sourceRepoRoot = sourceRepo
+            ? getRepoRoot(sourceRepo.owner, sourceRepo._id)
+            : repoRoot;
+
         const sourceCommitId = await getBranchCommitId(
-            repoRoot,
+            sourceRepoRoot,
             trimmedSource
         );
         const targetCommitId = await getBranchCommitId(
@@ -202,6 +251,7 @@ export const createPullRequest = async (req, res) => {
 
         const duplicate = await PullRequest.findOne({
             repository: result.repository._id,
+            sourceRepository: sourceRepo ? sourceRepo._id : null,
             sourceBranch: trimmedSource,
             targetBranch: trimmedTarget,
             status: "open"
@@ -222,6 +272,7 @@ export const createPullRequest = async (req, res) => {
         const pullRequest = await PullRequest.create({
             number: updated.prCount,
             repository: result.repository._id,
+            sourceRepository: sourceRepo ? sourceRepo._id : null,
             author: req.user._id,
             sourceBranch: trimmedSource,
             targetBranch: trimmedTarget,
@@ -257,6 +308,14 @@ export const createPullRequest = async (req, res) => {
                 pullRequestNumber: pullRequest.number,
                 pullRequestTitle: trimmedTitle
             }
+        });
+
+        emitDomainEvent(RT_EVENT.PR_CREATED, {
+            repositoryId: result.repository._id,
+            pullRequestId: pullRequest._id,
+            number: pullRequest.number,
+            title: trimmedTitle,
+            actor: req.user
         });
 
         return res.status(201).json(populated);
@@ -399,12 +458,22 @@ export const getPullRequestById = async (req, res) => {
             result.repository._id
         );
 
+        /* cross-repository: the source branch and its commits live in the
+           source repo's store */
+        const crossRepo = pullRequest.sourceRepository
+            ? await Repository.findById(pullRequest.sourceRepository)
+            : null;
+
+        const sourceRoot = crossRepo
+            ? getRepoRoot(crossRepo.owner, crossRepo._id)
+            : repoRoot;
+
         let sourceCommitId = null;
         let targetCommitId = null;
 
         try {
             sourceCommitId = await getBranchCommitId(
-                repoRoot,
+                sourceRoot,
                 pullRequest.sourceBranch
             );
         } catch {
@@ -424,18 +493,36 @@ export const getPullRequestById = async (req, res) => {
         let diff = null;
 
         if (sourceCommitId) {
-            [commits, diff] = await Promise.all([
-                getCommitsBetween(
+            if (crossRepo) {
+                const comparison = await computeCrossRepoComparison(
+                    sourceRoot,
+                    pullRequest.sourceBranch,
                     repoRoot,
-                    targetCommitId,
-                    sourceCommitId
-                ),
-                getCommitDiff(
-                    repoRoot,
-                    targetCommitId,
-                    sourceCommitId
-                )
-            ]);
+                    pullRequest.targetBranch
+                );
+
+                commits = comparison.commitsAhead;
+                diff = {
+                    files: comparison.diff,
+                    additions: 0,
+                    deletions: 0,
+                    totalAdditions: 0,
+                    totalDeletions: 0
+                };
+            } else {
+                [commits, diff] = await Promise.all([
+                    getCommitsBetween(
+                        repoRoot,
+                        targetCommitId,
+                        sourceCommitId
+                    ),
+                    getCommitDiff(
+                        repoRoot,
+                        targetCommitId,
+                        sourceCommitId
+                    )
+                ]);
+            }
         }
 
         return res.status(200).json({
@@ -507,6 +594,76 @@ export const getMergeStatus = async (req, res) => {
                 reviewRequirements: null,
                 sourceBranch: pullRequest.sourceBranch,
                 targetBranch: pullRequest.targetBranch
+            });
+        }
+
+        /* cross-repository pull request: source commits live in a
+           different repo than the target. The single-root merge engine
+           cannot merge across two stores, so merges are blocked; we still
+           surface the comparison so reviewers can evaluate the change. */
+        if (pullRequest.sourceRepository) {
+            const sourceRepo = await Repository.findById(
+                pullRequest.sourceRepository
+            );
+
+            if (!sourceRepo) {
+                return res.status(200).json({
+                    status: "CROSS_REPOSITORY",
+                    mergeable: false,
+                    blockReasons: ["Cross-repository pull requests cannot be merged"],
+                    sourceBranch: pullRequest.sourceBranch,
+                    targetBranch: pullRequest.targetBranch,
+                    sourceRepository: pullRequest.sourceRepository
+                });
+            }
+
+            const canReadSource = await canReadRepository(
+                req.user._id,
+                sourceRepo
+            );
+
+            const sourceRoot = getRepoRoot(
+                sourceRepo.owner,
+                sourceRepo._id
+            );
+            const targetRoot = getRepoRoot(
+                result.repository.owner,
+                result.repository._id
+            );
+
+            const comparison = canReadSource
+                ? await computeCrossRepoComparison(
+                    sourceRoot,
+                    pullRequest.sourceBranch,
+                    targetRoot,
+                    pullRequest.targetBranch
+                )
+                : null;
+
+            return res.status(200).json({
+                status: "CROSS_REPOSITORY",
+                mergeable: false,
+                blockReasons: [
+                    "Cross-repository pull requests cannot be merged"
+                ],
+                branchProtection: null,
+                reviewRequirements: null,
+                sourceBranch: pullRequest.sourceBranch,
+                targetBranch: pullRequest.targetBranch,
+                sourceRepository: pullRequest.sourceRepository,
+                targetRepository: result.repository._id,
+                comparison: canReadSource
+                    ? {
+                        sourceCommitId: comparison.sourceCommitId,
+                        targetCommitId: comparison.targetCommitId,
+                        commonAncestor: comparison.commonAncestor,
+                        ahead: comparison.ahead,
+                        behind: comparison.behind,
+                        commitsAhead: comparison.commitsAhead,
+                        commitsBehind: comparison.commitsBehind,
+                        diff: comparison.diff
+                    }
+                    : null
             });
         }
 
@@ -817,6 +974,18 @@ export const closePullRequest = async (req, res) => {
             }
         });
 
+        emitDomainEvent(RT_EVENT.PR_CLOSED, {
+            repositoryId: result.repository._id,
+            pullRequestId: pullRequest._id,
+            number: pullRequest.number,
+            actor: req.user
+        });
+
+        emitDomainEvent(RT_EVENT.PR_MERGE_STATUS_CHANGED, {
+            repositoryId: result.repository._id,
+            pullRequestId: pullRequest._id
+        });
+
         return res.status(200).json({
             message: "Pull request closed",
             number: pullRequest.number
@@ -916,6 +1085,18 @@ export const reopenPullRequest = async (req, res) => {
             }
         });
 
+        emitDomainEvent(RT_EVENT.PR_REOPENED, {
+            repositoryId: result.repository._id,
+            pullRequestId: pullRequest._id,
+            number: pullRequest.number,
+            actor: req.user
+        });
+
+        emitDomainEvent(RT_EVENT.PR_MERGE_STATUS_CHANGED, {
+            repositoryId: result.repository._id,
+            pullRequestId: pullRequest._id
+        });
+
         return res.status(200).json({
             message: "Pull request reopened",
             number: pullRequest.number
@@ -936,10 +1117,26 @@ export const reopenPullRequest = async (req, res) => {
 /* submit review */
 export const submitReview = async (req, res) => {
     try {
+        /* Any authenticated user with read access to the repository may
+           review a pull request (mirroring GitHub, where a viewer of a
+           public repo can submit an approval / request-changes / comment
+           review). For private repositories the reviewer must additionally
+           hold the REVIEW_PR permission through a collaborator or team role. */
         const result = await authorizeRepository(req, res, false);
 
         if (!result) {
             return;
+        }
+
+        if (result.repository.visibility !== "public") {
+            const permCheck = await authorizeRepositoryPermission(
+                req,
+                res,
+                PERMISSIONS.REVIEW_PR
+            );
+            if (!permCheck) {
+                return;
+            }
         }
 
         const number = parseNumber(req.params.number);
@@ -1092,10 +1289,24 @@ export const submitReview = async (req, res) => {
             pullRequest._id
         ).populate("reviews.reviewer", "userName email");
 
+        const newReview =
+            populated.reviews[populated.reviews.length - 1];
+
+        emitDomainEvent(RT_EVENT.PR_REVIEW_CREATED, {
+            repositoryId: result.repository._id,
+            pullRequestId: pullRequest._id,
+            review: newReview,
+            reviewState: deriveReviewState(populated.reviews),
+            actor: req.user
+        });
+
+        emitDomainEvent(RT_EVENT.PR_MERGE_STATUS_CHANGED, {
+            repositoryId: result.repository._id,
+            pullRequestId: pullRequest._id
+        });
+
         return res.status(201).json(
-            serializeReview(
-                populated.reviews[populated.reviews.length - 1]
-            )
+            serializeReview(newReview)
         );
     } catch (error) {
         return res.status(500).json({
@@ -1362,6 +1573,19 @@ export const updatePullRequestReview = async (req, res) => {
             pullRequest._id
         ).populate("reviews.reviewer", "userName email");
 
+        emitDomainEvent(RT_EVENT.PR_REVIEW_UPDATED, {
+            repositoryId: result.repository._id,
+            pullRequestId: pullRequest._id,
+            review: populated.reviews.id(reviewId),
+            reviewState: deriveReviewState(populated.reviews),
+            actor: req.user
+        });
+
+        emitDomainEvent(RT_EVENT.PR_MERGE_STATUS_CHANGED, {
+            repositoryId: result.repository._id,
+            pullRequestId: pullRequest._id
+        });
+
         return res.status(200).json(
             serializeReview(populated.reviews.id(reviewId))
         );
@@ -1453,9 +1677,17 @@ export const addPullRequestComment = async (req, res) => {
             pullRequest._id
         ).populate("comments.author", "userName email");
 
-        return res.status(201).json(
-            populated.comments[populated.comments.length - 1]
-        );
+        const newComment =
+            populated.comments[populated.comments.length - 1];
+
+        emitDomainEvent(RT_EVENT.PR_COMMENT_CREATED, {
+            repositoryId: result.repository._id,
+            pullRequestId: pullRequest._id,
+            comment: newComment,
+            actor: req.user
+        });
+
+        return res.status(201).json(newComment);
     } catch (error) {
         return res.status(500).json({
             message: "Server error"
@@ -1466,7 +1698,7 @@ export const addPullRequestComment = async (req, res) => {
 /* merge pull request */
 export const mergePullRequest = async (req, res) => {
     try {
-        const result = await authorizeRepository(req, res, true);
+        const result = await authorizeRepositoryPermission(req, res, PERMISSIONS.MERGE_PR);
 
         if (!result) {
             return;
@@ -1500,6 +1732,12 @@ export const mergePullRequest = async (req, res) => {
         if (pullRequest.status === "closed") {
             return res.status(400).json({
                 message: "Only open pull requests can be merged"
+            });
+        }
+
+        if (pullRequest.sourceRepository) {
+            return res.status(400).json({
+                message: "Cross-repository pull requests cannot be merged"
             });
         }
 
@@ -1634,6 +1872,19 @@ export const mergePullRequest = async (req, res) => {
                 }
             });
 
+            emitDomainEvent(RT_EVENT.PR_MERGED, {
+                repositoryId: result.repository._id,
+                pullRequestId: pullRequest._id,
+                number: pullRequest.number,
+                mergeCommitId: sourceCommitId,
+                actor: req.user
+            });
+
+            emitDomainEvent(RT_EVENT.PR_MERGE_STATUS_CHANGED, {
+                repositoryId: result.repository._id,
+                pullRequestId: pullRequest._id
+            });
+
             return res.status(200).json({
                 message: "Pull request merged",
                 merged: true,
@@ -1692,6 +1943,19 @@ export const mergePullRequest = async (req, res) => {
                     fastForward: false,
                     mergeCommitId: sourceCommitId
                 }
+            });
+
+            emitDomainEvent(RT_EVENT.PR_MERGED, {
+                repositoryId: result.repository._id,
+                pullRequestId: pullRequest._id,
+                number: pullRequest.number,
+                mergeCommitId: sourceCommitId,
+                actor: req.user
+            });
+
+            emitDomainEvent(RT_EVENT.PR_MERGE_STATUS_CHANGED, {
+                repositoryId: result.repository._id,
+                pullRequestId: pullRequest._id
             });
 
             return res.status(200).json({
@@ -1783,6 +2047,19 @@ export const mergePullRequest = async (req, res) => {
                 }
             });
 
+            emitDomainEvent(RT_EVENT.PR_MERGED, {
+                repositoryId: result.repository._id,
+                pullRequestId: pullRequest._id,
+                number: pullRequest.number,
+                mergeCommitId: sourceCommitId,
+                actor: req.user
+            });
+
+            emitDomainEvent(RT_EVENT.PR_MERGE_STATUS_CHANGED, {
+                repositoryId: result.repository._id,
+                pullRequestId: pullRequest._id
+            });
+
             return res.status(200).json({
                 message: "Pull request merged",
                 merged: true,
@@ -1844,6 +2121,19 @@ export const mergePullRequest = async (req, res) => {
                 fastForward: isFastForward,
                 mergeCommitId
             }
+        });
+
+        emitDomainEvent(RT_EVENT.PR_MERGED, {
+            repositoryId: result.repository._id,
+            pullRequestId: pullRequest._id,
+            number: pullRequest.number,
+            mergeCommitId,
+            actor: req.user
+        });
+
+        emitDomainEvent(RT_EVENT.PR_MERGE_STATUS_CHANGED, {
+            repositoryId: result.repository._id,
+            pullRequestId: pullRequest._id
         });
 
         return res.status(200).json({

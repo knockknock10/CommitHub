@@ -4,7 +4,7 @@ import bcrypt from "bcryptjs";
 import connectDB from "./config/db.js";
 import User from "./models/userModel.js";
 import Repository from "./models/repoModel.js";
-import Issue from "./models/issueMode.js";
+import Issue from "./models/issueModel.js";
 
 dotenv.config();
 /* connect database */

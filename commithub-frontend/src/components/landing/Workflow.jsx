@@ -1,88 +1,51 @@
-import "../../styles/workflow.css";
-
 const Workflow = () => {
-
     const workflowSteps = [
-
         {
             number: "01",
-            title: "Initialize Repository",
-
+            title: "Initialize",
             description:
-            "Create repositories and structure projects with organized version control."
+                "Create repositories and structure projects in seconds."
         },
-
         {
             number: "02",
-            title: "Track Changes",
-
+            title: "Track changes",
             description:
-            "Manage commits, branches, merges, and development history efficiently."
+                "Manage commits, branches, and history with full visibility."
         },
-
         {
             number: "03",
-            title: "Collaborate With Teams",
-
+            title: "Collaborate",
             description:
-            "Work together using shared repositories, issues, and development workflows."
+                "Review, discuss, and resolve issues and pull requests together."
         },
-
         {
             number: "04",
-            title: "Push & Deploy",
-
+            title: "Ship",
             description:
-            "Sync updates, manage remote repositories, and prepare projects for deployment."
+                "Release, tag, and deploy with a clear audit trail."
         }
     ];
 
     return (
+        <section className="landing-workflow" id="workflow">
+            <div className="landing-workflow-inner">
+                <div className="landing-workflow-header">
+                    <h2>Built around how developers work</h2>
+                    <p>From first commit to production, nothing gets lost.</p>
+                </div>
 
-        <section className="workflow">
-
-            <div className="workflow-header">
-
-                <p className="workflow-tag">
-                    development workflow
-                </p>
-
-                <h2 className="workflow-title">
-
-                    Built around the way
-                    developers already work.
-
-                </h2>
-
+                <div className="landing-workflow-steps">
+                    {workflowSteps.map((step, index) => (
+                        <div className="landing-workflow-step" key={index}>
+                            <span className="landing-workflow-step-num">
+                                {step.number}
+                            </span>
+                            <h3>{step.title}</h3>
+                            <p>{step.description}</p>
+                        </div>
+                    ))}
+                </div>
             </div>
-
-            <div className="workflow-grid">
-
-                {workflowSteps.map((step, index) => (
-
-                    <div
-                        className="workflow-card"
-                        key={index}
-                    >
-
-                        <span className="workflow-number">
-                            {step.number}
-                        </span>
-
-                        <h3>
-                            {step.title}
-                        </h3>
-
-                        <p>
-                            {step.description}
-                        </p>
-
-                    </div>
-
-                ))}
-
-            </div>
-
         </section>
     );
 };

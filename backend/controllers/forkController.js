@@ -11,11 +11,11 @@ import {
     getRepoRoot,
     ensureRepoStorageDir
 } from "../utils/repoStorage.js";
-import { createActivity } from "../utils/activityService.js";
+import { createActivity } from "../services/activityService.js";
 import {
     createNotification,
     buildNotificationMessage
-} from "../utils/notificationService.js";
+} from "../services/notificationService.js";
 import { emitDomainEvent } from "../utils/domainEvents.js";
 import { RT_EVENT } from "../realtime/eventTypes.js";
 

@@ -4,7 +4,7 @@ import path from "path";
 import crypto from "crypto";
 import User from "../models/userModel.js";
 import Repository from "../models/repoModel.js";
-import Issue from "../models/issueMode.js";
+import Issue from "../models/issueModel.js";
 import Comment from "../models/commentModel.js";
 import Collaborator from "../models/collaboratorModel.js";
 import {
@@ -16,12 +16,12 @@ import {
     assertRealPathWithin
 } from "../utils/repoStorage.js";
 import { authorizeRepository, authorizeRepositoryPermission } from "../utils/repoAccess.js";
-import { getUserRepositoryRole, roleHasPermission, PERMISSIONS } from "../utils/permissionService.js";
+import { getUserRepositoryRole, roleHasPermission, PERMISSIONS } from "../services/permissionService.js";
 import {
     createNotification,
     buildNotificationMessage
-} from "../utils/notificationService.js";
-import { createActivity } from "../utils/activityService.js";
+} from "../services/notificationService.js";
+import { createActivity } from "../services/activityService.js";
 import {
     getBranchCommitId,
     getTreeAtSnapshot,
@@ -36,6 +36,10 @@ import {
     getCommit as readCommit
 } from "../utils/repoVersion.js";
 import { findCommonAncestor, computeAheadBehind } from "../utils/diffMerge.js";
+import asyncHandler from "../utils/asyncHandler.js";
+import PullRequest from "../models/pullRequestModel.js";
+import { AppError } from "../middleware/errorHandler.js";
+
 
 const isVersionControlPath = (root, target) => {
     const relative = path.relative(root, target);
@@ -136,516 +140,443 @@ const validateWriteContent = (content) => {
 };
 
 /* star repository */
-export const starRepository = async (req, res) => {
-    try {
-        const { id } = req.params;
+export const starRepository = asyncHandler(async (req, res) => {
+    const { id } = req.params;
 
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({
-                message: "Invalid repository ID"
-            });
-        }
-
-        const repository = await Repository.findById(id);
-
-        if (!repository) {
-            return res.status(404).json({
-                message: "Repository not found"
-            });
-        }
-
-        const isOwner =
-            repository.owner.toString() === req.user._id.toString();
-
-        if (repository.visibility === "private" && !isOwner) {
-            return res.status(403).json({
-                message: "You do not have access to this repository"
-            });
-        }
-
-        // raw collection update: mongoose injects updatedAt via timestamps,
-        // which would make modifiedCount 1 even when nothing changed
-        const result = await User.collection.updateOne(
-            { _id: req.user._id },
-            { $addToSet: { starRepo: repository._id } }
-        );
-
-        if (result.modifiedCount === 1) {
-            await Repository.updateOne(
-                { _id: repository._id },
-                { $inc: { stars: 1 } }
-            );
-
-            await createNotification({
-                recipient: repository.owner,
-                actor: req.user._id,
-                type: "REPOSITORY_STARRED",
-                repository: repository._id,
-                message: buildNotificationMessage(
-                    "REPOSITORY_STARRED"
-                )
-            });
-
-            await createActivity({
-                actor: req.user._id,
-                type: "REPOSITORY_STARRED",
-                repository: repository._id
-            });
-        }
-
-        res.status(200).json({
-            stars: result.modifiedCount === 1
-                ? repository.stars + 1
-                : repository.stars,
-            isStarred: true
-        });
-    } catch (error) {
-        res.status(500).json({
-            message: "Server error"
-        });
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw new AppError("Invalid repository ID", 400);
     }
-};
 
-/* unstar repository */
-export const unstarRepository = async (req, res) => {
-    try {
-        const { id } = req.params;
+    const repository = await Repository.findById(id);
 
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({
-                message: "Invalid repository ID"
-            });
-        }
-
-        const repository = await Repository.findById(id);
-
-        if (!repository) {
-            return res.status(404).json({
-                message: "Repository not found"
-            });
-        }
-
-        const result = await User.collection.updateOne(
-            { _id: req.user._id },
-            { $pull: { starRepo: repository._id } }
-        );
-
-        if (result.modifiedCount === 1) {
-            await Repository.updateOne(
-                { _id: repository._id },
-                { $inc: { stars: -1 } }
-            );
-        }
-
-        res.status(200).json({
-            stars: result.modifiedCount === 1
-                ? Math.max(0, repository.stars - 1)
-                : repository.stars,
-            isStarred: false
-        });
-    } catch (error) {
-        res.status(500).json({
-            message: "Server error"
-        });
+    if (!repository) {
+        throw new AppError("Repository not found", 404);
     }
-}
-/* create repository */
-export const createRepository = async (req, res) => {
-    try {
-        const { name, description, visibility } = req.body;
 
-        if (!name || typeof name !== "string" || name.trim() === "") {
-            return res.status(400).json({
-                message: "Repository name must be a non-empty string"
-            });
-        }
+    const isOwner =
+        repository.owner.toString() === req.user._id.toString();
 
-        if (description !== undefined && typeof description !== "string") {
-            return res.status(400).json({
-                message: "Description must be a string"
-            });
-        }
+    if (repository.visibility === "private" && !isOwner) {
+        throw new AppError("You do not have access to this repository", 403);
+    }
 
-        if (visibility !== undefined && visibility !== "public" && visibility !== "private") {
-            return res.status(400).json({
-                message: "Visibility must be public or private"
-            });
-        }
+    // raw collection update: mongoose injects updatedAt via timestamps,
+    // which would make modifiedCount 1 even when nothing changed
+    const result = await User.collection.updateOne(
+        { _id: req.user._id },
+        { $addToSet: { starRepo: repository._id } }
+    );
 
-        const trimmedName = name.trim();
-
-        const existingRepo = await Repository.findOne({
-            name: trimmedName,
-            owner: req.user._id
-        });
-
-        if (existingRepo) {
-            return res.status(400).json({
-                message: "Repository already exists"
-            });
-        }
-
-        const repository = await Repository.create({
-            name: trimmedName,
-            description,
-            visibility,
-            owner: req.user._id,
-            branches: ["main"]
-        });
-
-        await User.updateOne(
-            { _id: req.user._id },
-            { $addToSet: { repositories: repository._id } }
+    if (result.modifiedCount === 1) {
+        await Repository.updateOne(
+            { _id: repository._id },
+            { $inc: { stars: 1 } }
         );
 
-        try {
-            await ensureRepoStorageDir(req.user._id, repository._id);
-        } catch (error) {
-            await Repository.findByIdAndDelete(repository._id);
-
-            return res.status(500).json({
-                message: "Server error"
-            });
-        }
+        await createNotification({
+            recipient: repository.owner,
+            actor: req.user._id,
+            type: "REPOSITORY_STARRED",
+            repository: repository._id,
+            message: buildNotificationMessage(
+                "REPOSITORY_STARRED"
+            )
+        });
 
         await createActivity({
             actor: req.user._id,
-            type: "REPOSITORY_CREATED",
+            type: "REPOSITORY_STARRED",
             repository: repository._id
         });
-
-        res.status(201).json(repository);
-    } catch (error) {
-        res.status(500).json({
-            message: "Server error"
-        });
     }
-};
+
+    res.status(200).json({
+        stars: result.modifiedCount === 1
+            ? repository.stars + 1
+            : repository.stars,
+        isStarred: true
+    });
+});
+
+/* unstar repository */
+export const unstarRepository = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw new AppError("Invalid repository ID", 400);
+    }
+
+    const repository = await Repository.findById(id);
+
+    if (!repository) {
+        throw new AppError("Repository not found", 404);
+    }
+
+    const result = await User.collection.updateOne(
+        { _id: req.user._id },
+        { $pull: { starRepo: repository._id } }
+    );
+
+    if (result.modifiedCount === 1) {
+        await Repository.updateOne(
+            { _id: repository._id },
+            { $inc: { stars: -1 } }
+        );
+    }
+
+    res.status(200).json({
+        stars: result.modifiedCount === 1
+            ? Math.max(0, repository.stars - 1)
+            : repository.stars,
+        isStarred: false
+    });
+});
+/* create repository */
+export const createRepository = asyncHandler(async (req, res) => {
+    const { name, description, visibility } = req.body;
+
+    if (!name || typeof name !== "string" || name.trim() === "") {
+        throw new AppError("Repository name must be a non-empty string", 400);
+    }
+
+    if (description !== undefined && typeof description !== "string") {
+        throw new AppError("Description must be a string", 400);
+    }
+
+    if (visibility !== undefined && visibility !== "public" && visibility !== "private") {
+        throw new AppError("Visibility must be public or private", 400);
+    }
+
+    const trimmedName = name.trim();
+
+    const existingRepo = await Repository.findOne({
+        name: trimmedName,
+        owner: req.user._id
+    });
+
+    if (existingRepo) {
+        throw new AppError("Repository already exists", 400);
+    }
+
+    const repository = await Repository.create({
+        name: trimmedName,
+        description,
+        visibility,
+        owner: req.user._id,
+        branches: ["main"]
+    });
+
+    await User.updateOne(
+        { _id: req.user._id },
+        { $addToSet: { repositories: repository._id } }
+    );
+
+    try {
+        await ensureRepoStorageDir(req.user._id, repository._id);
+    } catch (error) {
+        await Repository.findByIdAndDelete(repository._id);
+        throw new AppError("Failed to initialize repository storage", 500);
+    }
+
+    await createActivity({
+        actor: req.user._id,
+        type: "REPOSITORY_CREATED",
+        repository: repository._id
+    });
+
+    res.status(201).json(repository);
+});
 
 /* get repositories */
-// export const getRepositories = async (req, res) => {
-//     try {
-//         const repositories = await Repository.find({
-//             owner: req.user._id
-//         }).sort({
-//             createdAt: -1
-//         });
+export const getRepositories = asyncHandler(async (req, res) => {
+    const repositories = await Repository.find({
+        owner: req.user._id
+    }).sort({
+        createdAt: -1
+    });
 
-//         res.status(200).json(repositories);
-//     } catch (error) {
-//         res.status(500).json({
-//             message: error.message
-//         });
-//     }
-// };
-export const getRepositories = async (req, res) => {
-    try {
-        const repositories = await Repository.find({
-            owner: req.user._id
-        }).sort({
-            createdAt: -1
-        });
+    const repoIds = repositories.map((r) => r._id);
 
-        return res.status(200).json(repositories);
+    const [openIssues, openPRs] = await Promise.all([
+        Issue.aggregate([
+            { $match: { repository: { $in: repoIds }, status: "open" } },
+            { $group: { _id: "$repository", count: { $sum: 1 } } }
+        ]),
+        PullRequest.aggregate([
+            { $match: { repository: { $in: repoIds }, status: "open" } },
+            { $group: { _id: "$repository", count: { $sum: 1 } } }
+        ])
+    ]);
 
-    } catch (error) {
-        return res.status(500).json({
-            message: "Server error"
-        });
-    }
-};
+    const openIssueByRepo = Object.fromEntries(
+        openIssues.map((i) => [String(i._id), i.count])
+    );
+    const openPRByRepo = Object.fromEntries(
+        openPRs.map((p) => [String(p._id), p.count])
+    );
+
+    return res.status(200).json(
+        repositories.map((repo) => ({
+            ...repo.toObject(),
+            openIssues: openIssueByRepo[String(repo._id)] || 0,
+            prCount: openPRByRepo[String(repo._id)] || 0
+        }))
+    );
+});
+
 //fetch repo by id
-export const getRepositoryById = async (req,res) => {
-    try{
-        const { id } = req.params;
+export const getRepositoryById = asyncHandler(async (req,res) => {
+    const { id } = req.params;
 
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({
-                message: "Invalid repository ID"
-            });
-        }
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw new AppError("Invalid repository ID", 400);
+    }
 
-        const repository = await Repository.findById(id)
-            .populate("owner", "userName email");
-
-        if(!repository){
-            return res.status(404).json({
-                message: "Repository not found"
-            });
-        }
-
-        const isOwner =
-            repository.owner &&
-            repository.owner._id.toString() === req.user._id.toString();
-
-        const isStarred = req.user.starRepo
-            .some((repoId) =>
-                repoId.toString() === repository._id.toString()
-            );
-
-        if (isOwner) {
-            return res.status(200).json({
-                ...repository.toObject(),
-                isStarred,
-                isOwner,
-                userRole: "owner"
-            });
-        }
-
-        if (repository.visibility === "public") {
-            const role = await getUserRepositoryRole(req.user._id, repository._id);
-            return res.status(200).json({
-                ...repository.toObject(),
-                isStarred,
-                isOwner: false,
-                userRole: role || null
-            });
-        }
-
-        const role = await getUserRepositoryRole(req.user._id, repository._id);
-        if (role) {
-            return res.status(200).json({
-                ...repository.toObject(),
-                isStarred,
-                isOwner: false,
-                userRole: role
-            });
-        }
-
-        return res.status(403).json({
-            message: "You do not have access to this repository"
+    const repository = await Repository.findById(id)
+        .populate("owner", "userName email")
+        .populate({
+            path: "upstreamRepository",
+            select: "name owner",
+            populate: { path: "owner", select: "userName email" }
         });
-    }catch(error){
-        return res.status(500).json({
-            message: "Server error"
+
+    if(!repository){
+        throw new AppError("Repository not found", 404);
+    }
+
+    const isOwner =
+        repository.owner &&
+        repository.owner._id.toString() === req.user._id.toString();
+
+    const isStarred = req.user.starRepo
+        .some((repoId) =>
+            repoId.toString() === repository._id.toString()
+        );
+
+    const upstream = repository.upstreamRepository
+        ? {
+            _id: repository.upstreamRepository._id,
+            name: repository.upstreamRepository.name,
+            owner: repository.upstreamRepository.owner
+                ? {
+                    _id: repository.upstreamRepository.owner._id ||
+                        repository.upstreamRepository.owner,
+                    userName: repository.upstreamRepository.owner.userName || null,
+                    email: repository.upstreamRepository.owner.email || null
+                }
+                : null
+        }
+        : null;
+
+    if (isOwner) {
+        return res.status(200).json({
+            ...repository.toObject(),
+            isStarred,
+            isOwner,
+            userRole: "owner",
+            upstream
         });
     }
-}
+
+    if (repository.visibility === "public") {
+        const role = await getUserRepositoryRole(req.user._id, repository._id);
+        return res.status(200).json({
+            ...repository.toObject(),
+            isStarred,
+            isOwner: false,
+            userRole: role || null,
+            upstream
+        });
+    }
+
+    const role = await getUserRepositoryRole(req.user._id, repository._id);
+    if (role) {
+        return res.status(200).json({
+            ...repository.toObject(),
+            isStarred,
+            isOwner: false,
+            userRole: role,
+            upstream
+        });
+    }
+
+    throw new AppError("You do not have access to this repository", 403);
+});
 
 /* get repository tree */
-export const getRepositoryTree = async (req, res) => {
+export const getRepositoryTree = asyncHandler(async (req, res) => {
+    const { id } = req.params;
+
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw new AppError("Invalid repository ID", 400);
+    }
+
+    const repository = await Repository.findById(id);
+
+    if (!repository) {
+        throw new AppError("Repository not found", 404);
+    }
+
+    const isOwner =
+        repository.owner.toString() === req.user._id.toString();
+
+    if (repository.visibility === "private" && !isOwner) {
+        throw new AppError("You do not have access to this repository", 403);
+    }
+
+    const requestedPath = req.query.path || "";
+
+    const root = getRepoRoot(repository.owner, repository._id);
+    const safePath = resolveRepoPath(root, requestedPath);
+
+    if (!safePath) {
+        throw new AppError("Invalid path", 400);
+    }
+
+    if (isVersionControlPath(root, safePath)) {
+        throw new AppError("Path not found", 404);
+    }
+
+    let stat;
+
     try {
-        const { id } = req.params;
-
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({
-                message: "Invalid repository ID"
-            });
-        }
-
-        const repository = await Repository.findById(id);
-
-        if (!repository) {
-            return res.status(404).json({
-                message: "Repository not found"
-            });
-        }
-
-        const isOwner =
-            repository.owner.toString() === req.user._id.toString();
-
-        if (repository.visibility === "private" && !isOwner) {
-            return res.status(403).json({
-                message: "You do not have access to this repository"
-            });
-        }
-
-        const requestedPath = req.query.path || "";
-
-        const root = getRepoRoot(repository.owner, repository._id);
-        const safePath = resolveRepoPath(root, requestedPath);
-
-        if (!safePath) {
-            return res.status(400).json({
-                message: "Invalid path"
-            });
-        }
-
-        if (isVersionControlPath(root, safePath)) {
-            return res.status(404).json({
-                message: "Path not found"
-            });
-        }
-
-        let stat;
-
-        try {
-            stat = await fs.promises.stat(safePath);
-        } catch (error) {
-            if (safePath === root) {
-                return res.status(200).json({
-                    path: requestedPath,
-                    entries: []
-                });
-            }
-
-            return res.status(404).json({
-                message: "Path not found"
-            });
-        }
-
-        try {
-            assertRealPathWithin(root, safePath);
-        } catch (error) {
-            return res.status(400).json({
-                message: "Invalid path"
-            });
-        }
-
-        if (!stat.isDirectory()) {
-            return res.status(400).json({
-                message: "Path is not a directory"
-            });
-        }
-
-        const names = await fs.promises.readdir(safePath);
-        const entries = [];
-
-        for (const name of names) {
-            if (name === ".CommitHub") {
-                continue;
-            }
-
-            const entryStat = await fs.promises.stat(path.join(safePath, name));
-            const isDirectory = entryStat.isDirectory();
-
-            entries.push({
-                name,
-                type: isDirectory ? "folder" : "file",
-                path: requestedPath ? `${requestedPath}/${name}` : name,
-                updatedAt: entryStat.mtimeMs,
-                ...(isDirectory ? {} : { size: entryStat.size })
-            });
-        }
-
-        entries.sort((a, b) => {
-            if (a.type !== b.type) {
-                return a.type === "folder" ? -1 : 1;
-            }
-
-            return a.name.localeCompare(b.name);
-        });
-
-        return res.status(200).json({
-            path: requestedPath,
-            entries
-        });
+        stat = await fs.promises.stat(safePath);
     } catch (error) {
-        return res.status(500).json({
-            message: "Server error"
+        if (safePath === root) {
+            return res.status(200).json({
+                path: requestedPath,
+                entries: []
+            });
+        }
+
+        throw new AppError("Path not found", 404);
+    }
+
+    try {
+        assertRealPathWithin(root, safePath);
+    } catch (error) {
+        throw new AppError("Invalid path", 400);
+    }
+
+    if (!stat.isDirectory()) {
+        throw new AppError("Path is not a directory", 400);
+    }
+
+    const names = await fs.promises.readdir(safePath);
+    const entries = [];
+
+    for (const name of names) {
+        if (name === ".CommitHub") {
+            continue;
+        }
+
+        const entryStat = await fs.promises.stat(path.join(safePath, name));
+        const isDirectory = entryStat.isDirectory();
+
+        entries.push({
+            name,
+            type: isDirectory ? "folder" : "file",
+            path: requestedPath ? `${requestedPath}/${name}` : name,
+            updatedAt: entryStat.mtimeMs,
+            ...(isDirectory ? {} : { size: entryStat.size })
         });
     }
-};
+
+    entries.sort((a, b) => {
+        if (a.type !== b.type) {
+            return a.type === "folder" ? -1 : 1;
+        }
+
+        return a.name.localeCompare(b.name);
+    });
+
+    return res.status(200).json({
+        path: requestedPath,
+        entries
+    });
+});
 
 /* get repository file */
-export const getRepositoryFile = async (req, res) => {
-    try {
-        const { id } = req.params;
+export const getRepositoryFile = asyncHandler(async (req, res) => {
+    const { id } = req.params;
 
-        if (!mongoose.Types.ObjectId.isValid(id)) {
-            return res.status(400).json({
-                message: "Invalid repository ID"
-            });
-        }
-
-        const repository = await Repository.findById(id);
-
-        if (!repository) {
-            return res.status(404).json({
-                message: "Repository not found"
-            });
-        }
-
-        const isOwner =
-            repository.owner.toString() === req.user._id.toString();
-
-        if (repository.visibility === "private" && !isOwner) {
-            return res.status(403).json({
-                message: "You do not have access to this repository"
-            });
-        }
-
-        const requestedPath = req.query.path;
-
-        if (typeof requestedPath !== "string" || requestedPath.trim() === "") {
-            return res.status(400).json({
-                message: "A file path is required"
-            });
-        }
-
-        const root = getRepoRoot(repository.owner, repository._id);
-        const safePath = resolveRepoPath(root, requestedPath);
-
-        if (!safePath) {
-            return res.status(400).json({
-                message: "Invalid path"
-            });
-        }
-
-        if (isVersionControlPath(root, safePath)) {
-            return res.status(404).json({
-                message: "File not found"
-            });
-        }
-
-        let stat;
-
-        try {
-            stat = await fs.promises.stat(safePath);
-        } catch (error) {
-            return res.status(404).json({
-                message: "File not found"
-            });
-        }
-
-        try {
-            assertRealPathWithin(root, safePath);
-        } catch (error) {
-            return res.status(400).json({
-                message: "Invalid path"
-            });
-        }
-
-        if (stat.isDirectory()) {
-            return res.status(400).json({
-                message: "Path is a directory"
-            });
-        }
-
-        let content;
-
-        try {
-            ({ content } = await readTextFile(safePath));
-        } catch (error) {
-            if (error.code === "TOO_LARGE") {
-                return res.status(413).json({
-                    message: "File is too large to view"
-                });
-            }
-
-            if (error.code === "BINARY_FILE") {
-                return res.status(400).json({
-                    message: "Binary file cannot be viewed"
-                });
-            }
-
-            throw error;
-        }
-
-        return res.status(200).json({
-            path: requestedPath,
-            name: path.basename(safePath),
-            content,
-            size: stat.size,
-            updatedAt: stat.mtimeMs,
-            hash: hashContent(content)
-        });
-    } catch (error) {
-        return res.status(500).json({
-            message: "Server error"
-        });
+    if (!mongoose.Types.ObjectId.isValid(id)) {
+        throw new AppError("Invalid repository ID", 400);
     }
-};
+
+    const repository = await Repository.findById(id);
+
+    if (!repository) {
+        throw new AppError("Repository not found", 404);
+    }
+
+    const isOwner =
+        repository.owner.toString() === req.user._id.toString();
+
+    if (repository.visibility === "private" && !isOwner) {
+        throw new AppError("You do not have access to this repository", 403);
+    }
+
+    const requestedPath = req.query.path;
+
+    if (typeof requestedPath !== "string" || requestedPath.trim() === "") {
+        throw new AppError("A file path is required", 400);
+    }
+
+    const root = getRepoRoot(repository.owner, repository._id);
+    const safePath = resolveRepoPath(root, requestedPath);
+
+    if (!safePath) {
+        throw new AppError("Invalid path", 400);
+    }
+
+    if (isVersionControlPath(root, safePath)) {
+        throw new AppError("File not found", 404);
+    }
+
+    let stat;
+
+    try {
+        stat = await fs.promises.stat(safePath);
+    } catch (error) {
+        throw new AppError("File not found", 404);
+    }
+
+    try {
+        assertRealPathWithin(root, safePath);
+    } catch (error) {
+        throw new AppError("Invalid path", 400);
+    }
+
+    if (stat.isDirectory()) {
+        throw new AppError("Path is a directory", 400);
+    }
+
+    let content;
+
+    try {
+        ({ content } = await readTextFile(safePath));
+    } catch (error) {
+        if (error.code === "TOO_LARGE") {
+            throw new AppError("File is too large to view", 413);
+        }
+
+        if (error.code === "BINARY_FILE") {
+            throw new AppError("Binary file cannot be viewed", 400);
+        }
+
+        throw error;
+    }
+
+    return res.status(200).json({
+        path: requestedPath,
+        name: path.basename(safePath),
+        content,
+        size: stat.size,
+        updatedAt: stat.mtimeMs,
+        hash: hashContent(content)
+    });
+});
 
 /* create file */
 export const createRepositoryFile = async (req, res) => {
@@ -1263,6 +1194,21 @@ export const deleteRepository = async (req, res) => {
                 repositories: repository._id
             }
         });
+
+        /* a deleted repository's forks become independent: clear their
+           upstream link so they stand alone with their copied history */
+        await Repository.updateMany(
+            { upstreamRepository: repository._id },
+            { $set: { upstreamRepository: null } }
+        );
+
+        /* deleting a fork decrements its upstream's fork count */
+        if (repository.upstreamRepository) {
+            await Repository.updateOne(
+                { _id: repository.upstreamRepository },
+                { $inc: { forks: -1 } }
+            );
+        }
 
         await Repository.findByIdAndDelete(repository._id);
 

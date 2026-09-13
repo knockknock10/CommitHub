@@ -1,18 +1,21 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import {
+    FolderIcon,
+    FileIcon,
+    ChevronRightIcon,
+    CopyIcon,
+    CheckIcon,
+    BranchIcon
+} from "../ui/icons";
 import {
     fetchRepositoryFile,
     fetchRepositoryTree
 } from "../../api/repositoryApi";
 
 const formatBytes = (bytes) => {
-    if (bytes < 1024) {
-        return `${bytes} B`;
-    }
-
-    if (bytes < 1024 * 1024) {
-        return `${(bytes / 1024).toFixed(1)} KB`;
-    }
-
+    if (!Number.isFinite(bytes)) return "";
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
@@ -25,6 +28,7 @@ const RepositoryCode = ({ repository }) => {
     const [fileContent, setFileContent] = useState("");
     const [fileLoading, setFileLoading] = useState(false);
     const [fileError, setFileError] = useState("");
+    const [copied, setCopied] = useState(false);
 
     useEffect(() => {
         const loadTree = async () => {
@@ -40,7 +44,7 @@ const RepositoryCode = ({ repository }) => {
             } catch (error) {
                 setError(
                     error.response?.data?.message ||
-                    "Failed to load repository contents"
+                        "Failed to load repository contents"
                 );
             } finally {
                 setLoading(false);
@@ -53,18 +57,15 @@ const RepositoryCode = ({ repository }) => {
         setSelectedFile({ path: filePath });
         setFileContent("");
         setFileError("");
+        setCopied(false);
         setFileLoading(true);
 
         try {
-            const data = await fetchRepositoryFile(
-                repository._id,
-                filePath
-            );
+            const data = await fetchRepositoryFile(repository._id, filePath);
             setFileContent(data.content);
         } catch (error) {
             setFileError(
-                error.response?.data?.message ||
-                "Failed to load file"
+                error.response?.data?.message || "Failed to load file"
             );
         } finally {
             setFileLoading(false);
@@ -74,44 +75,105 @@ const RepositoryCode = ({ repository }) => {
     const navigateTo = (path) => {
         setSelectedFile(null);
         setFileError("");
+        setCopied(false);
         setCurrentPath(path);
     };
 
-    const segments = currentPath
-        ? currentPath.split("/")
-        : [];
+    const segments = useMemo(
+        () => (currentPath ? currentPath.split("/") : []),
+        [currentPath]
+    );
+
+    const copyToClipboard = async () => {
+        try {
+            await navigator.clipboard.writeText(fileContent);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+        } catch {
+            setCopied(false);
+        }
+    };
+
+    const contentLines = useMemo(() => fileContent.split("\n"), [fileContent]);
 
     return (
         <div className="code-browser">
-            <div className="code-browser-toolbar">
-                <span className="branch-reference">
-                    {repository.branches?.[0] || "main"}
-                </span>
-            </div>
-
             {selectedFile ? (
                 <div className="file-viewer">
                     <div className="file-viewer-header">
                         <button
                             className="file-viewer-back"
-                            onClick={() => setSelectedFile(null)}
+                            onClick={() => navigateTo(currentPath)}
                         >
-                            Back to files
+                            <ChevronRightIcon
+                                size={14}
+                                style={{ transform: "rotate(180deg)" }}
+                            />
+                            Files
                         </button>
-                        <strong>{selectedFile.path}</strong>
+                        <span className="file-viewer-path">
+                            <FileIcon size={14} />
+                            <strong>{selectedFile.path}</strong>
+                        </span>
+                        <span className="file-viewer-actions">
+                            {!fileLoading && !fileError && (
+                                <button
+                                    className="file-copy-btn"
+                                    onClick={copyToClipboard}
+                                    aria-label="Copy file contents"
+                                >
+                                    {copied ? (
+                                        <CheckIcon size={14} />
+                                    ) : (
+                                        <CopyIcon size={14} />
+                                    )}
+                                    {copied ? "Copied" : "Copy"}
+                                </button>
+                            )}
+                        </span>
                     </div>
-                    {fileLoading && <p>Loading file...</p>}
+                    {fileLoading && (
+                        <div className="shared-loading">
+                            <p>Loading file...</p>
+                        </div>
+                    )}
                     {fileError && (
-                        <p className="code-browser-error">{fileError}</p>
+                        <div className="shared-error">
+                            <p>{fileError}</p>
+                        </div>
                     )}
                     {!fileLoading && !fileError && (
-                        <pre className="code-viewer">
-                            {fileContent}
-                        </pre>
+                        <div className="code-viewer">
+                            <table className="code-lines">
+                                <tbody>
+                                    {contentLines.map((line, index) => (
+                                        <tr key={index} className="code-line">
+                                            <td className="code-line-no">
+                                                {index + 1}
+                                            </td>
+                                            <td className="code-line-content">
+                                                {line}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
                     )}
                 </div>
             ) : (
                 <div className="file-tree">
+                    <div className="code-browser-toolbar">
+                        <span className="branch-reference">
+                            <BranchIcon size={13} />
+                            {repository.branches?.[0] || "main"}
+                        </span>
+                        <span className="toolbar-spacer" />
+                        <span className="tree-entry-count">
+                            {entries.length}{" "}
+                            {entries.length === 1 ? "entry" : "entries"}
+                        </span>
+                    </div>
                     <div className="breadcrumbs">
                         <button
                             className="breadcrumb-link"
@@ -125,8 +187,11 @@ const RepositoryCode = ({ repository }) => {
                                 .join("/");
 
                             return (
-                                <span key={target}>
-                                    <span className="breadcrumb-separator">/</span>
+                                <span className="breadcrumb-seg" key={target}>
+                                    <ChevronRightIcon
+                                        size={14}
+                                        className="breadcrumb-sep"
+                                    />
                                     <button
                                         className="breadcrumb-link"
                                         onClick={() => navigateTo(target)}
@@ -138,40 +203,63 @@ const RepositoryCode = ({ repository }) => {
                         })}
                     </div>
 
-                    {loading && <p>Loading repository contents...</p>}
+                    {loading && (
+                        <div className="shared-loading">
+                            <p>Loading repository contents...</p>
+                        </div>
+                    )}
                     {error && (
-                        <p className="code-browser-error">{error}</p>
+                        <div className="shared-error">
+                            <p>{error}</p>
+                        </div>
                     )}
                     {!loading && !error && entries.length === 0 && (
-                        <p className="code-browser-empty">
-                            This repository is empty.
-                        </p>
+                        <div className="shared-empty-state">
+                            <p>This repository is empty.</p>
+                        </div>
                     )}
                     {!loading && !error && entries.length > 0 && (
                         <div className="file-list">
-                            {entries.map((entry) => (
-                                <button
-                                    key={entry.path}
-                                    className="file-row"
-                                    onClick={() =>
-                                        entry.type === "folder"
-                                            ? navigateTo(entry.path)
-                                            : openFile(entry.path)
-                                    }
-                                >
-                                    <span className="file-icon">
-                                        {entry.type === "folder" ? "📁" : "📄"}
-                                    </span>
-                                    <span className="file-name">
-                                        {entry.name}
-                                    </span>
-                                    {entry.size !== undefined && (
-                                        <span className="file-size">
-                                            {formatBytes(entry.size)}
+                            {entries.map((entry) => {
+                                const isFolder = entry.type === "folder";
+                                const size = entry.size;
+
+                                return (
+                                    <button
+                                        key={entry.path}
+                                        className="file-row"
+                                        onClick={() =>
+                                            isFolder
+                                                ? navigateTo(entry.path)
+                                                : openFile(entry.path)
+                                        }
+                                    >
+                                        {isFolder ? (
+                                            <ChevronRightIcon
+                                                size={14}
+                                                className="file-chevron"
+                                            />
+                                        ) : (
+                                            <span className="file-chevron-spacer" />
+                                        )}
+                                        <span className="file-icon">
+                                            {isFolder ? (
+                                                <FolderIcon size={16} />
+                                            ) : (
+                                                <FileIcon size={15} />
+                                            )}
                                         </span>
-                                    )}
-                                </button>
-                            ))}
+                                        <span className="file-name">
+                                            {entry.name}
+                                        </span>
+                                        {size !== undefined && (
+                                            <span className="file-size">
+                                                {formatBytes(size)}
+                                            </span>
+                                        )}
+                                    </button>
+                                );
+                            })}
                         </div>
                     )}
                 </div>

@@ -31,7 +31,7 @@ export const signup = async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({
-            message: error.message
+            message: "Server error"
         });
     }
 };
@@ -58,7 +58,7 @@ export const login = async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({
-            message: error.message
+            message: "Server error"
         });
     }
 };

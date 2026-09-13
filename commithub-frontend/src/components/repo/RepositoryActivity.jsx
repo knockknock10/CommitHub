@@ -85,12 +85,22 @@ const RepositoryActivity = ({ repository }) => {
                 ))}
             </div>
 
-            {loading && <p>Loading activity...</p>}
+            {loading && (
+                <div className="shared-loading">
+                    <p>Loading activity...</p>
+                </div>
+            )}
 
-            {error && <p>{error}</p>}
+            {error && (
+                <div className="shared-error">
+                    <p>{error}</p>
+                </div>
+            )}
 
             {!loading && !error && activities.length === 0 && (
-                <p className="activity-empty">No activity yet.</p>
+                <div className="shared-empty-state">
+                    <p>No activity yet.</p>
+                </div>
             )}
 
             {!loading && !error && activities.length > 0 && (
@@ -107,17 +117,17 @@ const RepositoryActivity = ({ repository }) => {
             {!loading && totalPages > 1 && (
                 <div className="activity-pagination">
                     <button
-                        className="activity-filter"
+                        className="pagination-btn"
                         disabled={page <= 1}
                         onClick={() => setPage((prev) => prev - 1)}
                     >
                         Previous
                     </button>
-                    <span>
+                    <span className="pagination-info">
                         Page {page} of {totalPages}
                     </span>
                     <button
-                        className="activity-filter"
+                        className="pagination-btn"
                         disabled={page >= totalPages}
                         onClick={() => setPage((prev) => prev + 1)}
                     >

@@ -14,7 +14,7 @@ import express from "express";
 
 import User from "../models/userModel.js";
 import Repository from "../models/repoModel.js";
-import Issue from "../models/issueMode.js";
+import Issue from "../models/issueModel.js";
 import Comment from "../models/commentModel.js";
 import repositoryRoutes from "../routes/repositoryRoutes.js";
 
@@ -117,6 +117,7 @@ after(async () => {
 
     server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
+    await mongoose.connection.db.dropDatabase();
     await mongoose.disconnect();
 });
 

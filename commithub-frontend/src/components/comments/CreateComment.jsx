@@ -9,11 +9,20 @@ const CreateComment = ({
     const [content,setContent] =
         useState("");
 
+    const [submitting,setSubmitting] =
+        useState(false);
+
+    const [error,setError] =
+        useState("");
+
     const handleSubmit = async(e)=>{
 
         e.preventDefault();
 
-        if(!content.trim()) return;
+        if(!content.trim() || submitting) return;
+
+        setSubmitting(true);
+        setError("");
 
         try{
 
@@ -26,9 +35,10 @@ const CreateComment = ({
 
             onCommentCreated();
 
-        }catch(err){
-
-            console.log(err);
+        } catch {
+            setError("Couldn't add comment. Please try again.");
+        } finally {
+            setSubmitting(false);
         }
     };
 
@@ -41,6 +51,7 @@ const CreateComment = ({
             <textarea
                 placeholder="Write a comment..."
                 value={content}
+                disabled={submitting}
                 onChange={(e)=>
                     setContent(
                         e.target.value
@@ -48,9 +59,11 @@ const CreateComment = ({
                 }
             />
 
-            <button type="submit">
-                Add Comment
+            <button type="submit" disabled={submitting}>
+                {submitting ? "Posting..." : "Add Comment"}
             </button>
+
+            {error && <p className="comment-error">{error}</p>}
 
         </form>
     );

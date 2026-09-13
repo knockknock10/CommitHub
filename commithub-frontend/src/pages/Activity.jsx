@@ -1,8 +1,12 @@
+import { useEffect, useMemo, useState } from "react";
 import DashboardLayout from "../components/dashboard/DashboardLayout";
 import ActivityItem from "../components/activity/ActivityItem";
 import { fetchActivity } from "../api/activityApi";
-import { ACTIVITY_GROUPS } from "../utils/activityUtils";
-import { useEffect, useState } from "react";
+import {
+    ACTIVITY_GROUPS,
+    activityDayGroup
+} from "../utils/activityUtils";
+import { useRealtimeEvent } from "../hooks/useRealtimeEvent";
 
 import "../styles/activity.css";
 
@@ -16,6 +20,7 @@ const Activity = () => {
     const [filter, setFilter] = useState("All");
     const [page, setPage] = useState(1);
     const [totalPages, setTotalPages] = useState(1);
+    const [reloadToken, setReloadToken] = useState(0);
 
     useEffect(() => {
         let isMounted = true;
@@ -24,9 +29,8 @@ const Activity = () => {
             setLoading(true);
             setError("");
 
-            const params = { limit: PAGE_SIZE, page };
-
             const types = ACTIVITY_GROUPS[filter];
+            const params = { limit: PAGE_SIZE, page };
 
             if (types.length > 0) {
                 params.type = types.join(",");
@@ -39,11 +43,11 @@ const Activity = () => {
                     setActivities(data.activities || []);
                     setTotalPages(data.pages || 1);
                 }
-            } catch (error) {
+            } catch (err) {
                 if (isMounted) {
                     setError(
-                        error.response?.data?.message ||
-                        "Failed to load activity"
+                        err.response?.data?.message ||
+                            "Unable to load activity."
                     );
                 }
             } finally {
@@ -58,35 +62,89 @@ const Activity = () => {
         return () => {
             isMounted = false;
         };
-    }, [filter, page]);
+    }, [filter, page, reloadToken]);
 
     const handleFilterChange = (nextFilter) => {
         setFilter(nextFilter);
         setPage(1);
     };
 
+    const grouped = useMemo(() => {
+        const groups = [];
+
+        for (const activity of activities) {
+            const label = activityDayGroup(activity.createdAt);
+            const last = groups[groups.length - 1];
+
+            if (last && last.label === label) {
+                last.items.push(activity);
+            } else {
+                groups.push({ label, items: [activity] });
+            }
+        }
+
+        return groups;
+    }, [activities]);
+
+    useRealtimeEvent("ACTIVITY_CREATED", (event) => {
+        if (page !== 1) {
+            return;
+        }
+
+        const groupTypes = ACTIVITY_GROUPS[filter] || [];
+
+        if (
+            groupTypes.length > 0 &&
+            !groupTypes.includes(event.activityType)
+        ) {
+            return;
+        }
+
+        setActivities((prev) => {
+            if (prev.some((a) => a._id === event.activityId)) {
+                return prev;
+            }
+
+            return [
+                {
+                    _id: event.activityId,
+                    type: event.activityType,
+                    actor: event.actor,
+                    repository: event.repositoryId,
+                    issue: event.issueId,
+                    pullRequest: event.pullRequestId,
+                    createdAt: event.createdAt
+                },
+                ...prev
+            ].slice(0, PAGE_SIZE);
+        });
+    });
+
     return (
         <DashboardLayout>
             <div className="activity-page">
-                <div className="activity-page-header">
-                    <div>
-                        <h1>Activity</h1>
-                        <p>
-                            Track commits, pull requests, issues, releases,
-                            branches, and repository events.
-                        </p>
-                    </div>
-                </div>
+                <header className="activity-page-header">
+                    <h1 className="activity-page-title">Activity</h1>
+                    <p className="activity-page-subtitle">
+                        Commits, issues, pull requests, releases, and branches
+                        across repositories you can access.
+                    </p>
+                </header>
 
-                <div className="activity-filters">
+                <div
+                    className="activity-filters"
+                    role="tablist"
+                    aria-label="Activity filters"
+                >
                     {FILTERS.map((name) => (
                         <button
                             key={name}
-                            className={
-                                filter === name
-                                    ? "activity-filter active"
-                                    : "activity-filter"
-                            }
+                            type="button"
+                            role="tab"
+                            aria-selected={filter === name}
+                            className={`activity-filter ${
+                                filter === name ? "active" : ""
+                            }`}
                             onClick={() => handleFilterChange(name)}
                         >
                             {name}
@@ -94,21 +152,51 @@ const Activity = () => {
                     ))}
                 </div>
 
-                {loading && <p>Loading activity...</p>}
+                {loading && (
+                    <div className="activity-loading" role="status">
+                        Loading activity...
+                    </div>
+                )}
 
-                {error && <p>{error}</p>}
+                {!loading && error && (
+                    <div className="activity-error" role="alert">
+                        <p>{error}</p>
+                        <button
+                            type="button"
+                            className="state-btn"
+                            onClick={() => setReloadToken((prev) => prev + 1)}
+                        >
+                            Retry
+                        </button>
+                    </div>
+                )}
 
                 {!loading && !error && activities.length === 0 && (
-                    <p className="activity-empty">No activity yet.</p>
+                    <div className="activity-empty">
+                        <p>No recent activity.</p>
+                    </div>
                 )}
 
                 {!loading && !error && activities.length > 0 && (
-                    <div className="activity-timeline">
-                        {activities.map((activity) => (
-                            <ActivityItem
-                                key={activity._id}
-                                activity={activity}
-                            />
+                    <div className="activity-stream">
+                        {grouped.map((group) => (
+                            <section
+                                className="activity-group"
+                                key={group.label}
+                            >
+                                <h2 className="activity-group-label">
+                                    {group.label}
+                                </h2>
+                                <ul className="activity-list">
+                                    {group.items.map((activity) => (
+                                        <li key={activity._id}>
+                                            <ActivityItem
+                                                activity={activity}
+                                            />
+                                        </li>
+                                    ))}
+                                </ul>
+                            </section>
                         ))}
                     </div>
                 )}
@@ -116,17 +204,19 @@ const Activity = () => {
                 {!loading && totalPages > 1 && (
                     <div className="activity-pagination">
                         <button
-                            className="activity-filter"
+                            type="button"
+                            className="btn outline small"
                             disabled={page <= 1}
                             onClick={() => setPage((prev) => prev - 1)}
                         >
                             Previous
                         </button>
-                        <span>
+                        <span className="pagination-info">
                             Page {page} of {totalPages}
                         </span>
                         <button
-                            className="activity-filter"
+                            type="button"
+                            className="btn outline small"
                             disabled={page >= totalPages}
                             onClick={() => setPage((prev) => prev + 1)}
                         >

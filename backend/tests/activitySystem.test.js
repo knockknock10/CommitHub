@@ -17,13 +17,13 @@ import express from "express";
 
 import User from "../models/userModel.js";
 import Repository from "../models/repoModel.js";
-import Issue from "../models/issueMode.js";
+import Issue from "../models/issueModel.js";
 import Comment from "../models/commentModel.js";
 import PullRequest from "../models/pullRequestModel.js";
 import Tag from "../models/tagModel.js";
 import Release from "../models/releaseModel.js";
 import Activity from "../models/activityModel.js";
-import { createActivity } from "../utils/activityService.js";
+import { createActivity } from "../services/activityService.js";
 import repositoryRoutes from "../routes/repositoryRoutes.js";
 import issueRoutes from "../routes/issueRoutes.js";
 import commentRoutes from "../routes/commentRoutes.js";
@@ -363,6 +363,7 @@ after(async () => {
 
     server.closeAllConnections();
     await new Promise((resolve) => server.close(resolve));
+    await mongoose.connection.db.dropDatabase();
     await mongoose.disconnect();
 });
 

@@ -143,6 +143,7 @@ before(async () => {
 after(async () => {
     await User.deleteMany({});
     await Repository.deleteMany({});
+    await mongoose.connection.db.dropDatabase();
     await mongoose.disconnect();
     server.close();
     await fs.promises.rm(storageRoot, {

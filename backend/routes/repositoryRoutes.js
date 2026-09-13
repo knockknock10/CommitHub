@@ -89,7 +89,8 @@ import {
     addCollaborator,
     updateCollaborator,
     removeCollaborator,
-    getMyCollaboratorRole
+    getMyCollaboratorRole,
+    getCollaboratingRepositories
 } from "../controllers/collaboratorController.js";
 import {
     forkRepository,
@@ -101,6 +102,9 @@ const router = express.Router();
 router.route("/")
 .post(protect, createRepository)
 .get(protect, getRepositories);
+
+router.route("/collaborating")
+.get(protect, getCollaboratingRepositories);
 
 router.route("/:id")
 .get(protect, getRepositoryById)

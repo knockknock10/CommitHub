@@ -13,15 +13,15 @@ const describeResolveError = (error) => {
 
     if (status === 409) {
         if (statusCode === "STALE_SOURCE_BRANCH") {
-            return "The source branch changed since the conflicts were loaded. Reload the resolver and try again.";
+            return "The source stream changed since the conflicts were loaded. Reload the resolver and try again.";
         }
 
         if (statusCode === "STALE_TARGET_BRANCH") {
-            return "The target branch changed since the conflicts were loaded. Reload the resolver and try again.";
+            return "The target stream changed since the conflicts were loaded. Reload the resolver and try again.";
         }
 
         if (statusCode === "DIRTY_TREE") {
-            return serverMessage || "The source branch is checked out with uncommitted changes.";
+            return serverMessage || "The source stream is checked out with uncommitted changes.";
         }
 
         return serverMessage || "There are no conflicts left to resolve.";
@@ -277,7 +277,7 @@ const PullRequestConflictResolver = ({
                     files must be resolved together; the result is
                     committed to{" "}
                     <strong>{pullRequest.sourceBranch}</strong> and
-                    the target branch is never modified.
+                    the target stream is never modified.
                 </p>
             </div>
 
@@ -326,7 +326,7 @@ const PullRequestConflictResolver = ({
             {unresolvableConflicts.length > 0 && (
                 <p className="conflict-resolver-note">
                     Delete/modify conflicts cannot be resolved here.
-                    Resolve them with normal commits on the branches.
+                    Resolve them with normal commits on the streams.
                 </p>
             )}
 
