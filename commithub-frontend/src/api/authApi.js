@@ -9,7 +9,9 @@ export const signupUser = async (userData) => {
         );
         return response.data;
     } catch (err) {
-        if (err.offline) throw new Error("Server unreachable — please try again later");
+        if (err.offline) {
+            throw new Error("Server unreachable — please try again later", { cause: err });
+        }
         throw err;
     }
 };
@@ -23,7 +25,9 @@ export const loginUser = async (userData) => {
         );
         return response.data;
     } catch (err) {
-        if (err.offline) throw new Error("Server unreachable — please try again later");
+        if (err.offline) {
+            throw new Error("Server unreachable — please try again later", { cause: err });
+        }
         throw err;
     }
 };
