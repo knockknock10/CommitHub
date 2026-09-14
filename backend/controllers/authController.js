@@ -18,9 +18,14 @@ export const signup = async (req, res) => {
             return res.status(400).json({ message: "Password must be at least 8 characters" });
         }
 
+        const existingUserName = await User.findOne({ userName });
+        if (existingUserName) {
+            return res.status(400).json({ message: "Username already exists" });
+        }
+
         const existingUser = await User.findOne({ email });
         if (existingUser) {
-            return res.status(400).json({ message: "User already exists" });
+            return res.status(400).json({ message: "Email already exists" });
         }
 
         const hashedPassword = await bcrypt.hash(password, 10);
