@@ -30,7 +30,7 @@ api.interceptors.request.use(
                         config.headers.Authorization = `Bearer ${user.token}`;
                     }
                 }
-            } catch (e) {
+            } catch {
                 localStorage.removeItem("commithub-user");
             }
         }
@@ -54,13 +54,20 @@ api.interceptors.response.use(
         const message = error.response?.data?.message || "An unexpected error occurred";
 
         switch (status) {
-            case 401:
+            case 401: {
                 // Token expired or invalid — clear and signal auth error
                 localStorage.removeItem("commithub-user");
+                window.dispatchEvent(new CustomEvent("commithub:session-expired"));
                 const authErr = new AuthError(message || "Session expired. Please sign in again.");
                 authErr.status = 401;
                 authErr.redirectTo = "/login";
                 return Promise.reject(authErr);
+            }
+            case 400:
+            case 409:
+                // Client-side validation / conflicts — surfaced inline in the UI,
+                // no need to log as errors.
+                break;
             case 403:
                 console.error("[Forbidden]:", message);
                 break;
