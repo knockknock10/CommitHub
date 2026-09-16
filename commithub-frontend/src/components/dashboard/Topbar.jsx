@@ -164,9 +164,11 @@ const Topbar = ({ onToggleSidebar, hideSearch = false }) => {
                 </button>
 
                 <Link to="/" className="topbar-brand" aria-label="CommitHub home">
-                    <span className="topbar-brand-mark" aria-hidden="true">
-                        AA
-                    </span>
+                    <svg viewBox="0 0 32 32" fill="none" width="18" height="18" className="topbar-brand-mark" aria-hidden="true">
+                        <path d="M16 2L2 9l14 7 14-7-14-7z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M2 23l14 7 14-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M2 16l14 7 14-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                    </svg>
                     <span className="topbar-brand-name">CommitHub</span>
                 </Link>
 
