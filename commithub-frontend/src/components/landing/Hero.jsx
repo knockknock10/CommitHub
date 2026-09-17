@@ -1,6 +1,8 @@
 import { useNavigate } from "react-router-dom";
 
 const Hero = () => {
+    const navigate = useNavigate();
+
     return (
         <section className="ch-hero">
             <div className="ch-hero-grain" aria-hidden="true" />
@@ -12,8 +14,8 @@ const Hero = () => {
                     <span className="ch-hero-title-accent">one dashboard.</span>
                 </h1>
                 <p className="ch-hero-desc">
-                    CommitHub hosts your code, tracks issues, manages pull requests,
-                    and runs your CI/CD pipelines — all in one place.
+                    Track issues, review pull requests, and stay on top of
+                    every repo — from one place.
                 </p>
                 <div className="ch-hero-actions">
                     <a href="/signup" className="ch-hero-cta ch-hero-cta-primary">
@@ -26,15 +28,7 @@ const Hero = () => {
                         Sign in
                     </a>
                 </div>
-                <div className="ch-hero-chips">
-                    <span className="ch-chip">Repositories</span>
-                    <span className="ch-chip">Issues & PRs</span>
-                    <span className="ch-chip">CI/CD</span>
-                    <span className="ch-chip">Discussions</span>
-                    <span className="ch-chip">Teams</span>
-                </div>
             </div>
-
             <div className="ch-hero-visual">
                 <div className="ch-app-window">
                     <div className="ch-app-window-bar">
@@ -52,7 +46,6 @@ const Hero = () => {
                         </div>
                         <span className="ch-app-window-badge">sdk</span>
                     </div>
-
                     <div className="ch-app-content">
                         <div className="ch-app-sidebar">
                             <div className="ch-sidebar-item ch-sidebar-item-active">
@@ -106,7 +99,6 @@ const Hero = () => {
                                 Starred
                             </div>
                         </div>
-
                         <div className="ch-app-main">
                             <div className="ch-file-tree">
                                 <div className="ch-file-tree-header">
@@ -141,7 +133,6 @@ const Hero = () => {
                                     <span className="ch-file-icon ch-file-icon-file">📄</span>  └── LICENSE
                                 </div>
                             </div>
-
                             <div className="ch-code-window">
                                 <div className="ch-code-header">
                                     <div className="ch-code-header-dots">
@@ -155,8 +146,7 @@ const Hero = () => {
                                         <span className="ch-code-lang">Go</span>
                                     </div>
                                 </div>
-                                <div className="ch-code-body"><code>{`
-package internal
+                                <div className="ch-code-body"><code>{`package internal
 
 import (
     "context"
@@ -193,40 +183,13 @@ func NewClient(token string, opts ...Option) (*Client, error) {
         http:      httpclient.New(c.timeout),
         userAgent: c.userAgent,
     }, nil
-}
-
-// GetRepo returns the requested repository.
-func (c *Client) GetRepo(ctx context.Context, owner, repo string) (*Repository, error) {
-    req, err := http.NewRequestWithContext(ctx,
-        http.MethodGet,
-        c.baseURL+"/api/repos/"+owner+"/"+repo,
-        nil)
-    if err != nil {
-        return nil, err
-    }
-
-    req.Header.Set("Authorization", "Bearer "+c.token)
-    req.Header.Set("User-Agent", c.userAgent)
-
-    resp, err := c.http.Do(req)
-    if err != nil {
-        return nil, err
-    }
-    defer resp.Body.Close()
-
-    var r Repository
-    if err := json.NewDecoder(resp.Body).Decode(&r); err != nil {
-        return nil, err
-    }
-    return &r, nil
-}
-`}</code>
-                                </div>
+}`}</code>
                             </div>
                         </div>
                     </div>
                 </div>
             </div>
+        </div>
         </section>
     );
 };
