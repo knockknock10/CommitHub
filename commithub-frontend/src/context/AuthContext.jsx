@@ -4,7 +4,6 @@ import {
     useEffect,
     useState
 } from "react";
-import api from "../api/axios";
 
 const AuthContext = createContext();
 
@@ -32,11 +31,20 @@ export const AuthProvider = ({ children }) => {
                 } else {
                     setUser(parsed);
                 }
-            } catch (e) {
+            } catch {
                 localStorage.removeItem("commithub-user");
             }
         }
         setLoading(false);
+    }, []);
+
+    useEffect(() => {
+        const handleSessionExpired = () => {
+            setUser(null);
+            localStorage.removeItem("commithub-user");
+        };
+        window.addEventListener("commithub:session-expired", handleSessionExpired);
+        return () => window.removeEventListener("commithub:session-expired", handleSessionExpired);
     }, []);
 
     const login = (userData) => {
