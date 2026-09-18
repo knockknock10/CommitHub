@@ -1501,3 +1501,34 @@
     .ch-hero-chips { display: none; }
     .ch-nav-right .ch-nav-signin { display: none; }
 }
+
+/* Hero brand subtle float */
+@keyframes ch-float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+}
+
+.ch-hero-eyebrow svg {
+    animation: ch-float 4s ease-in-out infinite;
+}
+
+/* Interactive repo card hover */
+.ch-repo-card {
+    transition: transform 200ms ease, box-shadow 200ms ease, border-color 200ms ease;
+}
+
+.ch-repo-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 16px rgba(0,0,0,0.3);
+    border-color: rgba(48, 54, 63, 0.9);
+}
+
+/* Stat number hover */
+.ch-hero-stat-num {
+    transition: color 200ms ease, text-shadow 200ms ease;
+}
+
+.ch-hero-stat:hover .ch-hero-stat-num {
+    color: #58a6ff;
+    text-shadow: 0 0 20px rgba(88, 166, 255, 0.3);
+}
