@@ -1,7 +1,7 @@
 {
   "name": "backend",
   "version": "1.0.0",
-  "description": "CommitHub – A lightweight personal version control system for managing commits, branches, and merges with a local and collaborative workflow. Designed to teach and demonstrate Git-like functionality in a clean, developer-friendly CLI.",
+  "description": "Backend for CommitHub, a collaboration app with repositories, branches, pull requests, code reviews and Git-like merge workflows.",
   "main": "server.js",
   "type": "module",
   "bin": {
